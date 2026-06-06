@@ -183,7 +183,7 @@
                 <li><a href="#flow1">Data Flow #1: Dispatch to Pickup</a></li>
                 <li><a href="#flow2">Data Flow #2: Pickup to Hospital</a></li>
                 <li><a href="#tech-stack">Technology Stack</a></li>
-                <li><a href="#deployment">Deployment Architecture (AWS EC2 + S3)</a></li>
+                <li><a href="#deployment">Deployment Architecture (AWS)</a></li>
             </ol>
         </div>
 
@@ -454,9 +454,9 @@ graph TB
 
         <!-- Diagram 6: Deployment Architecture -->
         <div class="diagram-section" id="deployment">
-            <h2>6. Deployment Architecture (AWS EC2 + S3)</h2>
+            <h2>6. Deployment Architecture (AWS)</h2>
             <p class="diagram-description">
-                The static frontend (React console build + ambulance driver page) is hosted on <strong>AWS S3</strong> (static website, optionally fronted by CloudFront). The FastAPI backend runs on an <strong>AWS EC2</strong> instance via Uvicorn. Browsers load the UI from S3 and connect to EC2 over HTTPS/WSS for REST + WebSocket; EC2 calls external OSRM and Overpass via httpx.
+                Static frontend (React console build + ambulance driver page) on <strong>S3</strong>, fronted by <strong>CloudFront</strong> (ACM TLS) with <strong>AWS WAF</strong>. The FastAPI backend runs on <strong>EC2 in an Auto Scaling group</strong> behind an <strong>ALB</strong> (HTTPS/WSS) inside a VPC — EC2 now, with an <strong>ECS/Fargate</strong> migration path planned for Phase 3 (dashed). Shared state in <strong>ElastiCache (Redis)</strong>, persistence in <strong>RDS PostgreSQL (Multi-AZ)</strong>, secrets in <strong>Secrets Manager + KMS</strong>, and logs/metrics in <strong>CloudWatch</strong>. EC2 calls external OSRM and Overpass via httpx.
             </p>
             <div class="diagram-controls">
                 <button onclick="downloadDiagram('mermaid6')">Download as PNG</button>
@@ -464,42 +464,59 @@ graph TB
             </div>
             <div class="mermaid" id="mermaid6">
 graph TB
-    subgraph "Users"
-        BROWSER["🌐 Browser<br/>(Dispatch + Ambulance crews)"]
+    BROWSER["🌐 Users<br/>Dispatch operators + Ambulance crews"]
+    R53["Route 53<br/>(DNS)"]
+
+    subgraph "Static Frontend (HTTPS)"
+        WAF1["AWS WAF"]
+        CF["CloudFront<br/>(CDN + ACM TLS)"]
+        S3["S3 Bucket<br/>React build + driver page<br/>(versioning, OAC)"]
     end
 
-    subgraph "AWS S3 - Static Frontend"
-        S3["S3 Bucket (static website)<br/>- React console build (/dist)<br/>- Ambulance driver page<br/>(optional: CloudFront CDN)"]
+    subgraph "VPC"
+        subgraph "Public Subnet"
+            ALB["Application Load Balancer<br/>HTTPS / WSS (ACM TLS)"]
+        end
+        subgraph "Private Subnet"
+            EC2["EC2 Auto Scaling Group<br/>Uvicorn + FastAPI<br/>(REST + WebSocket)"]
+            FARGATE["ECS / Fargate Service<br/>(Phase 3 migration)"]
+            REDIS["ElastiCache Redis<br/>registry + sessions"]
+            RDS["RDS PostgreSQL (Multi-AZ)<br/>audit + history"]
+        end
     end
 
-    subgraph "AWS EC2 - Backend"
-        EC2["EC2 Instance<br/>Uvicorn + FastAPI<br/>(REST + WebSocket)"]
-        STATE["In-memory state<br/>(registry + incidents)"]
-        SEED["Seed JSON files"]
+    subgraph "Security & Observability"
+        SECRETS["Secrets Manager + KMS"]
+        CW["CloudWatch<br/>logs / metrics / alarms"]
     end
 
     subgraph "External Services"
-        OSRM["OSRM Demo<br/>/route + /table"]
+        OSRM["OSRM<br/>/route + /table"]
         OSM["Overpass API"]
     end
 
-    BROWSER -->|"1. GET UI (HTTPS)"| S3
-    S3 -->|"static assets"| BROWSER
-    BROWSER -->|"2. REST + WS (HTTPS/WSS)"| EC2
-    EC2 --> STATE
-    EC2 --> SEED
+    BROWSER --> R53
+    R53 -->|static UI| CF
+    WAF1 --- CF
+    CF --> S3
+    R53 -->|REST + WS| ALB
+    ALB --> EC2
+    ALB -.->|Phase 3| FARGATE
+    EC2 --> REDIS
+    EC2 --> RDS
+    EC2 --> SECRETS
+    EC2 --> CW
     EC2 -->|httpx| OSRM
     EC2 -->|httpx| OSM
-
-    PHASE3["Phase 3: scale out<br/>(ALB + multiple EC2, Redis, RDS/PostgreSQL)"]
-    EC2 -.->|planned| PHASE3
+    FARGATE -.-> REDIS
+    FARGATE -.-> RDS
             </div>
         </div>
     </div>
 
     <footer>
         <p>Lifeline AI - Emergency Response Platform | Architecture & Design Documentation</p>
-        <p style="margin-top: 1rem; font-size: 0.9rem;">Generated: June 2026 | Version 2.0</p>
+        <p style="margin-top: 1rem; font-size: 0.9rem;">Generated: June 2026 | Version 2.2</p>
     </footer>
 
     <script>
