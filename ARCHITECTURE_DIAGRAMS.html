@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lifeline AI - Architecture Diagrams</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+
+        header {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 2rem;
+            text-align: center;
+            border-bottom: 2px solid #00d4ff;
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.2);
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            color: #00d4ff;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        header p { color: #a0a0a0; font-size: 1.1rem; }
+
+        nav {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid #00d4ff;
+        }
+
+        nav ul {
+            list-style: none;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            justify-content: center;
+        }
+
+        nav a {
+            color: #00d4ff;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        nav a:hover {
+            background: rgba(0, 212, 255, 0.2);
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.8);
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem 1rem; }
+
+        .diagram-section {
+            margin-bottom: 3rem;
+            background: rgba(20, 20, 30, 0.8);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 212, 255, 0.1);
+            scroll-margin-top: 100px;
+        }
+
+        .diagram-section h2 {
+            color: #00d4ff;
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid rgba(0, 212, 255, 0.3);
+            text-shadow: 0 0 5px rgba(0, 212, 255, 0.5);
+        }
+
+        .diagram-description {
+            color: #b0b0b0;
+            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            background: rgba(30, 30, 40, 0.5);
+            border-radius: 4px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            overflow-x: auto;
+        }
+
+        .diagram-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            color: white;
+            border: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+        }
+
+        button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 212, 255, 0.4); }
+        button:active { transform: translateY(0); }
+
+        footer {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 2rem;
+            text-align: center;
+            color: #606060;
+            border-top: 1px solid #00d4ff;
+            margin-top: 3rem;
+        }
+
+        .toc {
+            background: rgba(20, 20, 30, 0.8);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .toc h2 { color: #00d4ff; margin-bottom: 1rem; }
+        .toc ol { margin-left: 1.5rem; color: #b0b0b0; }
+        .toc li { margin-bottom: 0.5rem; }
+        .toc a { color: #00d4ff; text-decoration: none; }
+        .toc a:hover { text-decoration: underline; }
+
+        @media (max-width: 768px) {
+            header h1 { font-size: 1.8rem; }
+            nav ul { gap: 0.5rem; }
+            nav a { padding: 0.4rem 0.8rem; font-size: 0.8rem; }
+            .diagram-section { padding: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🚑 Lifeline AI - Architecture Diagrams</h1>
+        <p>Predictive Emergency Routing & Hospital Intelligence Platform</p>
+    </header>
+
+    <nav>
+        <ul>
+            <li><a href="#system-arch">System</a></li>
+            <li><a href="#components">Components</a></li>
+            <li><a href="#flow1">Flow #1</a></li>
+            <li><a href="#flow2">Flow #2</a></li>
+            <li><a href="#tech-stack">Tech Stack</a></li>
+            <li><a href="#deployment">Deployment</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <div class="toc">
+            <h2>📋 Table of Contents</h2>
+            <ol>
+                <li><a href="#system-arch">High-Level System Architecture</a></li>
+                <li><a href="#components">Component Architecture</a></li>
+                <li><a href="#flow1">Data Flow #1: Dispatch to Pickup</a></li>
+                <li><a href="#flow2">Data Flow #2: Pickup to Hospital</a></li>
+                <li><a href="#tech-stack">Technology Stack</a></li>
+                <li><a href="#deployment">Deployment Architecture (AWS EC2 + S3)</a></li>
+            </ol>
+        </div>
+
+        <!-- Diagram 1: High-Level System Architecture -->
+        <div class="diagram-section" id="system-arch">
+            <h2>1. High-Level System Architecture</h2>
+            <p class="diagram-description">
+                The React dispatch console and plain HTML/JS ambulance driver page communicate with the FastAPI backend over WebSocket and REST. The backend calls OSRM (routing) and Overpass (hospitals) via httpx, and keeps ambulance + incident state in memory.
+            </p>
+            <div class="diagram-controls">
+                <button onclick="downloadDiagram('mermaid1')">Download as PNG</button>
+                <button onclick="copySVG('mermaid1')">Copy SVG</button>
+            </div>
+            <div class="mermaid" id="mermaid1">
+graph TB
+    subgraph "Client Layer"
+        AMB["🚑 Ambulance Driver Page<br/>(plain HTML/JS)"]
+        DISP["🎛️ Dispatch Console<br/>(React 18 SPA)"]
+    end
+
+    subgraph "Communication"
+        WS["WebSocket<br/>/ws/ambulance/{id} · /ws/dispatch"]
+        REST["REST (HTTP)<br/>/dispatch · /mock/incidents · /api/trigger-hospital"]
+    end
+
+    subgraph "Application Layer (FastAPI / Uvicorn)"
+        API["FastAPI App (main.py)"]
+        REG["Registry (connections + GPS)"]
+        ROUTING["Routing (OSRM client)"]
+        HOSP["Hospitals (Overpass client)"]
+        AI_LAYER["AI Decision Layer"]
+    end
+
+    subgraph "In-Memory State"
+        DB["Ambulance Registry"]
+        INCIDENT_STORE["Incident Store<br/>(congestion / blockage)"]
+    end
+
+    subgraph "External Services"
+        OSRM["OSRM Demo<br/>/route + /table"]
+        OSM["Overpass API"]
+        GEO["Browser Geolocation"]
+    end
+
+    AMB -->|GPS & pickup events| WS
+    DISP -->|listener| WS
+    DISP -->|dispatch / incident / trigger| REST
+    WS -->|route / hospital_route| AMB
+    WS -->|snapshot / position / hospital_route| DISP
+
+    WS --> API
+    REST --> API
+    API --> REG
+    API --> ROUTING
+    API --> HOSP
+    API --> AI_LAYER
+    AI_LAYER --> INCIDENT_STORE
+    REG --> DB
+
+    ROUTING -->|httpx| OSRM
+    HOSP -->|httpx| OSM
+    AMB -->|getCurrentPosition| GEO
+            </div>
+        </div>
+
+        <!-- Diagram 2: Component Architecture -->
+        <div class="diagram-section" id="components">
+            <h2>2. Component Architecture</h2>
+            <p class="diagram-description">
+                Frontend and backend components. Note the asymmetry: the dispatch console is a React SPA, while the ambulance driver page is dependency-free HTML/JS.
+            </p>
+            <div class="mermaid" id="mermaid2">
+graph TB
+    subgraph "Frontend - Driver (plain HTML/JS)"
+        AMBUI["ambulance/index.html + app.js<br/>Map · Route · Pickup · Security · GPS"]
+    end
+
+    subgraph "Frontend - Console (React 18 + Vite)"
+        DISPUI["App.jsx / pages<br/>Dispatch · Ambulances · Hospitals · RouteView"]
+        DISPMAP["MapView / AmbulanceMap (react-leaflet)"]
+        DISPCTX["DispatchContext (global state)"]
+    end
+
+    subgraph "Backend - Core (FastAPI)"
+        WSHANDLERS["WS handlers<br/>/ws/ambulance/{id} · /ws/dispatch"]
+        ROUTES["HTTP routes<br/>/dispatch · /ambulances · /mock/incidents · /api/trigger-hospital"]
+        PIPELINE["_run_hospital_pipeline()"]
+    end
+
+    subgraph "Backend - Logic"
+        REGISTRY["registry.py"]
+        ROUTING["routing.py<br/>get_candidate_routes · hospital_durations"]
+        AI_LOGIC["ai_layer.py<br/>choose_route · choose_hospital_route"]
+        HOSPITAL_LOGIC["hospitals.py<br/>find_nearby_hospitals"]
+        TRAFFIC_LOGIC["traffic.py<br/>incident_store · incidents_on_route"]
+        MODELS["models.py (Pydantic)"]
+    end
+
+    subgraph "Data & External"
+        OSRM_SVC["OSRM (/route + /table)"]
+        OSM_API["Overpass API"]
+        SEED["ambulances.json · mock_incidents.json · nigeriahealthfacilities.json"]
+    end
+
+    AMBUI -->|ws gps / pickup_complete| WSHANDLERS
+    WSHANDLERS -->|route / hospital_route| AMBUI
+    DISPUI --> DISPMAP
+    DISPUI --> DISPCTX
+    DISPCTX -->|ws listener| WSHANDLERS
+    DISPCTX -->|REST| ROUTES
+
+    ROUTES --> REGISTRY
+    WSHANDLERS --> PIPELINE
+    ROUTES --> PIPELINE
+    ROUTES --> ROUTING
+    PIPELINE --> HOSPITAL_LOGIC
+    PIPELINE --> ROUTING
+    PIPELINE --> AI_LOGIC
+    AI_LOGIC --> TRAFFIC_LOGIC
+
+    ROUTING -->|httpx| OSRM_SVC
+    HOSPITAL_LOGIC -->|httpx| OSM_API
+    REGISTRY -->|load| SEED
+    TRAFFIC_LOGIC -->|seed| SEED
+    MODELS --> ROUTES
+    MODELS --> AI_LOGIC
+            </div>
+        </div>
+
+        <!-- Diagram 3: Data Flow #1 -->
+        <div class="diagram-section" id="flow1">
+            <h2>3. Data Flow #1: Dispatch to Pickup</h2>
+            <p class="diagram-description">
+                From ambulance connection and GPS streaming through dispatch, OSRM route computation, and the route push back to the ambulance.
+            </p>
+            <div class="mermaid" id="mermaid3">
+sequenceDiagram
+    actor Ambulance as 🚑 Crew
+    participant AmbUnit as Driver Page
+    participant Backend as FastAPI
+    participant Registry as Registry
+    participant OSRM as OSRM
+    participant Dispatch as Console
+    actor DispatchOp as Operator
+
+    DispatchOp->>Dispatch: Open console
+    Dispatch->>Backend: ws /ws/dispatch
+    Backend-->>Dispatch: snapshot + incident_snapshot
+
+    Ambulance->>AmbUnit: Open /ambulance (LAG-A12)
+    AmbUnit->>Backend: ws /ws/ambulance/LAG-A12
+    Backend->>Registry: register
+
+    loop Every 1-5 sec
+        AmbUnit->>Backend: {type: gps, lat, lng, heading}
+        Backend->>Registry: update_position
+        Backend->>Dispatch: {type: position}
+    end
+
+    DispatchOp->>Dispatch: Click map + select unit + Send
+    Dispatch->>Backend: POST /dispatch {ambulance_id, pickup}
+    Backend->>Backend: resolve origin (GPS or fallback)
+    Backend->>OSRM: GET /route (candidates)
+    OSRM-->>Backend: {distance, duration, geometry}
+    Backend->>Backend: choose_route() (fastest)
+    Backend-->>Dispatch: {status, duration_s, distance_m}
+    Backend->>AmbUnit: {type: route, geometry, pickup}
+    AmbUnit->>AmbUnit: Render route
+            </div>
+        </div>
+
+        <!-- Diagram 4: Data Flow #2 -->
+        <div class="diagram-section" id="flow2">
+            <h2>4. Data Flow #2: Pickup to Hospital</h2>
+            <p class="diagram-description">
+                The hospital pipeline: discover (Overpass) → pre-rank (OSRM Table, top 3) → route each finalist → decide by effective time → security recommendation.
+            </p>
+            <div class="mermaid" id="mermaid4">
+sequenceDiagram
+    actor Ambulance as 🚑 Crew
+    participant AmbUnit as Driver Page
+    participant Backend as FastAPI
+    participant Hospitals as hospitals.py
+    participant OSM as Overpass
+    participant OSRM as OSRM
+    participant AI as ai_layer.py
+    participant Incidents as Incident Store
+
+    Ambulance->>AmbUnit: Tap "Patient Picked Up"
+    AmbUnit->>Backend: ws pickup_complete
+    Note over Backend: or via POST trigger-hospital
+
+    Backend->>Hospitals: find_nearby_hospitals(origin)
+    Hospitals->>OSM: Query hospitals in bbox
+    OSM-->>Hospitals: Hospital list
+
+    Backend->>OSRM: GET /table (durations)
+    OSRM-->>Backend: durations, top 3 finalists
+
+    loop Each finalist
+        Backend->>OSRM: GET /route (candidates)
+        OSRM-->>Backend: routes
+    end
+
+    Backend->>AI: choose_hospital_route(finalists, incidents)
+    AI->>Incidents: all() active incidents
+    AI->>AI: effective = duration plus on-route delays, pick min
+
+    alt clearable congestion saves over 300s
+        AI-->>Backend: security_recommendation true
+    else blockage, below threshold, or none
+        AI-->>Backend: security_recommendation false
+    end
+
+    Backend->>AmbUnit: {type: hospital_route, destination, route, alternatives, security_recommendation}
+    AmbUnit->>AmbUnit: Show hospital route + banner
+            </div>
+        </div>
+
+        <!-- Diagram 5: Technology Stack -->
+        <div class="diagram-section" id="tech-stack">
+            <h2>5. Technology Stack</h2>
+            <p class="diagram-description">
+                Actual frameworks and libraries in the repository. The dispatch console is React 18 + Vite; the driver page is plain HTML/JS; the backend uses FastAPI with a single httpx client for all external calls.
+            </p>
+            <div class="mermaid" id="mermaid5">
+graph TB
+    subgraph "Frontend - Console"
+        REACT["React 18 + Vite 5"]
+        RLEAFLET["react-leaflet + Leaflet"]
+        ROUTER["react-router-dom"]
+        FRAMER["framer-motion · lucide-react"]
+        CSS["Hand-written CSS3"]
+    end
+
+    subgraph "Frontend - Driver"
+        HTML["Plain HTML + vanilla JS"]
+        GEOLOC["Browser Geolocation API"]
+    end
+
+    subgraph "Backend"
+        FASTAPI["FastAPI + Uvicorn"]
+        PYTHON["Python 3.11+"]
+        PYDANTIC["Pydantic"]
+        HTTPX["httpx (async)"]
+    end
+
+    subgraph "External"
+        OSRM["OSRM (/route + /table)"]
+        OSM["Overpass API"]
+        TILES["OSM Tiles"]
+    end
+
+    REACT --> RLEAFLET
+    REACT --> ROUTER
+    REACT --> FRAMER
+    REACT --> CSS
+    RLEAFLET --> TILES
+    HTML --> GEOLOC
+
+    FASTAPI --> PYTHON
+    FASTAPI --> PYDANTIC
+    FASTAPI --> HTTPX
+    HTTPX --> OSRM
+    HTTPX --> OSM
+            </div>
+        </div>
+
+        <!-- Diagram 6: Deployment Architecture -->
+        <div class="diagram-section" id="deployment">
+            <h2>6. Deployment Architecture (AWS EC2 + S3)</h2>
+            <p class="diagram-description">
+                The static frontend (React console build + ambulance driver page) is hosted on <strong>AWS S3</strong> (static website, optionally fronted by CloudFront). The FastAPI backend runs on an <strong>AWS EC2</strong> instance via Uvicorn. Browsers load the UI from S3 and connect to EC2 over HTTPS/WSS for REST + WebSocket; EC2 calls external OSRM and Overpass via httpx.
+            </p>
+            <div class="diagram-controls">
+                <button onclick="downloadDiagram('mermaid6')">Download as PNG</button>
+                <button onclick="copySVG('mermaid6')">Copy SVG</button>
+            </div>
+            <div class="mermaid" id="mermaid6">
+graph TB
+    subgraph "Users"
+        BROWSER["🌐 Browser<br/>(Dispatch + Ambulance crews)"]
+    end
+
+    subgraph "AWS S3 - Static Frontend"
+        S3["S3 Bucket (static website)<br/>- React console build (/dist)<br/>- Ambulance driver page<br/>(optional: CloudFront CDN)"]
+    end
+
+    subgraph "AWS EC2 - Backend"
+        EC2["EC2 Instance<br/>Uvicorn + FastAPI<br/>(REST + WebSocket)"]
+        STATE["In-memory state<br/>(registry + incidents)"]
+        SEED["Seed JSON files"]
+    end
+
+    subgraph "External Services"
+        OSRM["OSRM Demo<br/>/route + /table"]
+        OSM["Overpass API"]
+    end
+
+    BROWSER -->|"1. GET UI (HTTPS)"| S3
+    S3 -->|"static assets"| BROWSER
+    BROWSER -->|"2. REST + WS (HTTPS/WSS)"| EC2
+    EC2 --> STATE
+    EC2 --> SEED
+    EC2 -->|httpx| OSRM
+    EC2 -->|httpx| OSM
+
+    PHASE3["Phase 3: scale out<br/>(ALB + multiple EC2, Redis, RDS/PostgreSQL)"]
+    EC2 -.->|planned| PHASE3
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>Lifeline AI - Emergency Response Platform | Architecture & Design Documentation</p>
+        <p style="margin-top: 1rem; font-size: 0.9rem;">Generated: June 2026 | Version 2.0</p>
+    </footer>
+
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+        mermaid.contentLoaded();
+
+        function downloadDiagram(elementId) {
+            const element = document.getElementById(elementId);
+            const svgElement = element.querySelector('svg');
+
+            if (svgElement) {
+                const svgData = new XMLSerializer().serializeToString(svgElement);
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+
+                canvas.width = svgElement.clientWidth;
+                canvas.height = svgElement.clientHeight;
+
+                img.onload = function() {
+                    ctx.drawImage(img, 0, 0);
+                    const link = document.createElement('a');
+                    link.href = canvas.toDataURL('image/png');
+                    link.download = `diagram-${elementId}.png`;
+                    link.click();
+                };
+
+                img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+            } else {
+                alert('SVG not yet rendered. Please wait a moment and try again.');
+            }
+        }
+
+        function copySVG(elementId) {
+            const element = document.getElementById(elementId);
+            const svgElement = element.querySelector('svg');
+
+            if (svgElement) {
+                const svgData = new XMLSerializer().serializeToString(svgElement);
+                navigator.clipboard.writeText(svgData).then(() => {
+                    alert('SVG copied to clipboard!');
+                }).catch(err => {
+                    console.error('Failed to copy:', err);
+                });
+            }
+        }
+
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
