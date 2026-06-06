@@ -1,0 +1,20 @@
+{
+  "incidents": [
+    {
+      "type": "congestion",
+      "lat": 6.5112,
+      "lng": 3.3625,
+      "radius_m": 520,
+      "delay_min": 20,
+      "description": "Ikorodu Road — heavy market-day congestion"
+    },
+    {
+      "type": "blockage",
+      "lat": 6.5043,
+      "lng": 3.3550,
+      "radius_m": 200,
+      "delay_min": 45,
+      "description": "Herbert Macaulay Way — fallen trailer"
+    }
+  ]
+}

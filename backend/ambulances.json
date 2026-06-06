@@ -1,7 +1,15 @@
 {
   "ambulances": [
-    { "id": "AMB-001", "label": "Unit 1" },
-    { "id": "AMB-002", "label": "Unit 2" },
-    { "id": "AMB-003", "label": "Unit 3" }
+    { "id": "LAG-A12", "label": "Unit A12", "type": "Advanced Life Support", "crew": "Paramedic + EMT", "plate": "LND-238-AA" },
+    { "id": "LAG-B07", "label": "Unit B07", "type": "Advanced Life Support", "crew": "Paramedic + EMT", "plate": "KJA-114-XB" },
+    { "id": "LAG-C21", "label": "Unit C21", "type": "Basic Life Support",    "crew": "EMT x2",          "plate": "EPE-907-LC" },
+    { "id": "LAG-D03", "label": "Unit D03", "type": "Advanced Life Support", "crew": "Paramedic + EMT", "plate": "AGL-552-KD" },
+    { "id": "LAG-E15", "label": "Unit E15", "type": "Basic Life Support",    "crew": "EMT x2",          "plate": "IKD-330-RE" },
+    { "id": "LAG-F09", "label": "Unit F09", "type": "Advanced Life Support", "crew": "Paramedic + EMT", "plate": "SUR-741-MF" },
+    { "id": "IBD-A01", "label": "Unit A01", "type": "Advanced Life Support", "crew": "Paramedic + EMT", "plate": "OYO-112-AA" },
+    { "id": "IBD-B02", "label": "Unit B02", "type": "Basic Life Support",    "crew": "EMT x2",          "plate": "OYO-334-BA" },
+    { "id": "IBD-C03", "label": "Unit C03", "type": "Advanced Life Support", "crew": "Paramedic + EMT", "plate": "OYO-567-CA" },
+    { "id": "IBD-D04", "label": "Unit D04", "type": "Basic Life Support",    "crew": "EMT x2",          "plate": "OYO-789-DA" },
+    { "id": "IBD-E05", "label": "Unit E05", "type": "Advanced Life Support", "crew": "Paramedic + EMT", "plate": "OYO-901-EA" }
   ]
 }
