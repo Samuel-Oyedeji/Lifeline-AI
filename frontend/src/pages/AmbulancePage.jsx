@@ -159,7 +159,8 @@ export default function AmbulancePage() {
   // ── WebSocket ───────────────────────────────────────────────────────────────
   const connectWs = useCallback(() => {
     setWsStatus('connecting')
-    const ws = new WebSocket(`ws://${location.host}/ws/ambulance/${ambulanceId}`)
+    const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const ws = new WebSocket(`${wsProtocol}//${location.host}/ws/ambulance/${ambulanceId}`)
     wsRef.current = ws
 
     ws.onopen = () => {
