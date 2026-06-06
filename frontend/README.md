@@ -4,8 +4,7 @@ Predictive emergency routing & hospital intelligence for Nigerian cities.
 LifeLine AI doesn't just find the fastest route it **predicts future congestion**
 and intelligently routes patients to the **best available hospital**.
 
-Built as a dark, glassmorphic, neon-accented operator console — a mix of
-**Uber + Google Maps + a medical dashboard**.
+Built as a dark, glassmorphic, neon-accented operator console 
 
 ---
 
@@ -166,7 +165,7 @@ Ambulance WebSocket messages (send):
 
 ---
 
-## 🎨 Design system
+## Design system
 
 Tokens are defined as CSS variables in [`src/index.css`](src/index.css):
 `--bg`, `--primary`, `--secondary`, `--success`, `--warning`, `--critical`, etc.
