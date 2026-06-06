@@ -5,7 +5,12 @@ import { useDispatch } from '../context/DispatchContext.jsx'
 import { EMERGENCY_TYPES, PRIORITIES } from '../data/hospitals.js'
 import { BoltIcon, CheckIcon, PinIcon } from '../components/Icons.jsx'
 
-const STEPS = ['Analyzing Hospitals', 'Checking Traffic', 'Predicting Congestion']
+const STEPS = [
+  'Locating Nearest Ambulance',
+  'Analyzing Hospitals',
+  'Checking Traffic',
+  'Predicting Congestion',
+]
 
 const pageMotion = {
   initial: { opacity: 0, y: 16 },
@@ -29,7 +34,7 @@ export default function Dispatch() {
     STEPS.forEach((_, i) => {
       setTimeout(() => setStepDone(i), 700 * (i + 1))
     })
-    setTimeout(() => navigate('/hospitals'), 700 * (STEPS.length + 1))
+    setTimeout(() => navigate('/ambulances'), 700 * (STEPS.length + 1))
   }
 
   return (

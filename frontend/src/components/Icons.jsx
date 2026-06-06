@@ -80,3 +80,11 @@ export const HeartIcon = (p) => (
     <path d="M12 20s-7-4.6-9.2-9C1.3 8 3 4.5 6.5 4.5c2 0 3.2 1.2 4 2.3.8-1.1 2-2.3 4-2.3C22 4.5 22.7 8 21.2 11 19 15.4 12 20 12 20z" />
   </svg>
 )
+export const AmbulanceIcon = (p) => (
+  <svg {...base} {...p}>
+    <path d="M2 7h11v9H2zM13 10h4l3 3v3h-7z" />
+    <circle cx="6.5" cy="18" r="1.8" />
+    <circle cx="16.5" cy="18" r="1.8" />
+    <path d="M6 3.5v3M4.5 5h3" />
+  </svg>
+)

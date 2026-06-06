@@ -7,6 +7,7 @@ import Sidebar from './components/Sidebar.jsx'
 import StatusWidget from './components/StatusWidget.jsx'
 
 import Dispatch from './pages/Dispatch.jsx'
+import Ambulances from './pages/Ambulances.jsx'
 import Hospitals from './pages/Hospitals.jsx'
 import RouteView from './pages/RouteView.jsx'
 import Summary from './pages/Summary.jsx'
@@ -25,6 +26,7 @@ export default function App() {
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
             <Route path="/" element={<Dispatch />} />
+            <Route path="/ambulances" element={<Ambulances />} />
             <Route path="/hospitals" element={<Hospitals />} />
             <Route path="/route" element={<RouteView />} />
             <Route path="/summary" element={<Summary />} />

@@ -23,7 +23,7 @@ const SPARKS = Array.from({ length: 22 }, (_, i) => ({
 
 export default function Summary() {
   const navigate = useNavigate()
-  const { dispatch, selectedHospital } = useDispatch()
+  const { dispatch, selectedHospital, selectedAmbulance } = useDispatch()
 
   const emergency = EMERGENCY_TYPES.find((e) => e.id === dispatch.emergencyType)
   const priority = PRIORITIES.find((p) => p.id === dispatch.priority)
@@ -78,6 +78,18 @@ export default function Summary() {
           <p>
             {emergency?.label} emergency routed to {selectedHospital.name} with predictive rerouting.
           </p>
+          {selectedAmbulance && (
+            <span
+              className="chip"
+              style={{
+                marginTop: 14,
+                color: 'var(--secondary)',
+                borderColor: 'rgba(6,182,212,0.4)',
+              }}
+            >
+              🚑 Unit {selectedAmbulance.id} · {selectedAmbulance.type}
+            </span>
+          )}
 
           <div className="summary-metrics">
             {metrics.map((m, i) => (
