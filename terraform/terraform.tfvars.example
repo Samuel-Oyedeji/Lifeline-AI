@@ -1,0 +1,5 @@
+# Copy to terraform.tfvars and override any defaults from variables.tf
+# project_name  = "myapp"
+# environment   = "prod"
+# aws_region    = "us-east-1"
+# instance_type = "t3.small"
