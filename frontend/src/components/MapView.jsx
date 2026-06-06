@@ -1,8 +1,6 @@
 import { MapContainer, TileLayer, Polyline, Circle, CircleMarker, Tooltip } from 'react-leaflet'
 import { PATIENT_LOCATION, ROUTES, TRAFFIC_ZONE } from '../data/hospitals.js'
 
-// Dark, label-light basemap from CARTO (free, no API key) — gives the
-// Uber/Tesla-style night map look.
 const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
 const ATTR = '&copy; OpenStreetMap &copy; CARTO'
 
@@ -22,7 +20,6 @@ export default function MapView({ hospital, showRecommended = true, showCurrent 
     >
       <TileLayer url={DARK_TILES} attribution={ATTR} subdomains="abcd" maxZoom={20} />
 
-      {/* Predicted congestion zone (orange) */}
       <Circle
         center={TRAFFIC_ZONE.center}
         radius={TRAFFIC_ZONE.radius}
@@ -36,7 +33,6 @@ export default function MapView({ hospital, showRecommended = true, showCurrent 
         <Tooltip>{TRAFFIC_ZONE.label}</Tooltip>
       </Circle>
 
-      {/* Current naive route (red) */}
       {showCurrent && (
         <Polyline
           positions={ROUTES.current}
@@ -44,7 +40,6 @@ export default function MapView({ hospital, showRecommended = true, showCurrent 
         />
       )}
 
-      {/* AI recommended reroute (green) */}
       {showRecommended && (
         <Polyline
           positions={ROUTES.recommended}
@@ -52,7 +47,6 @@ export default function MapView({ hospital, showRecommended = true, showCurrent 
         />
       )}
 
-      {/* Patient marker */}
       <CircleMarker
         center={PATIENT_LOCATION.coords}
         radius={9}
@@ -63,7 +57,6 @@ export default function MapView({ hospital, showRecommended = true, showCurrent 
         </Tooltip>
       </CircleMarker>
 
-      {/* Hospital marker */}
       <CircleMarker
         center={hospital.coords}
         radius={10}
