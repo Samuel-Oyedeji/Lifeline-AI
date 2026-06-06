@@ -14,17 +14,72 @@ body { font-family: system-ui, sans-serif; display: flex; flex-direction: column
 .badge.disconnected { background: #c0392b; color: #fff; }
 .badge.reconnecting { background: #e67e22; color: #fff; }
 
+/* ── Pickup button bar ── */
+#pickup-bar {
+  padding: 8px 16px; background: #1d6f42; flex-shrink: 0;
+  display: flex; align-items: center;
+}
+#pickup-bar.hidden { display: none; }
+#pickup-btn {
+  width: 100%; padding: 10px; background: #27ae60; color: #fff;
+  border: none; border-radius: 6px; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: background 0.15s;
+}
+#pickup-btn:hover   { background: #1e8449; }
+#pickup-btn:disabled { background: #555; cursor: not-allowed; }
+
+/* ── Map ── */
 #map { flex: 1; min-height: 0; }
 
+/* ── Route to pickup banner ── */
 #route-banner {
-  padding: 10px 16px; background: #2980b9; color: #fff;
-  font-size: 14px; display: flex; gap: 16px; align-items: center;
+  padding: 8px 16px; background: #2980b9; color: #fff;
+  font-size: 13px; display: flex; gap: 16px; align-items: center;
   flex-shrink: 0;
 }
 #route-banner.hidden { display: none; }
 
+/* ── Hospital banner ── */
+#hospital-banner {
+  padding: 8px 16px; background: #1a4a6e; color: #fff;
+  font-size: 13px; flex-shrink: 0;
+}
+#hospital-banner.hidden { display: none; }
+#hospital-header { font-size: 14px; margin-bottom: 4px; }
+#hospital-times  { display: flex; gap: 16px; }
+.delay-note { color: #f39c12; font-size: 12px; }
+
+/* ── Security banner ── */
+#security-banner {
+  padding: 10px 16px; background: #6c1f1f; color: #fff;
+  flex-shrink: 0; border-left: 4px solid #e74c3c;
+}
+#security-banner.hidden { display: none; }
+#security-header { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+#security-reason { font-size: 12px; color: #f5a; margin-bottom: 4px; }
+#security-savings { font-size: 12px; color: #f9ca24; margin-bottom: 8px; }
+#request-security-btn {
+  padding: 6px 14px; background: #e74c3c; color: #fff; border: none;
+  border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+
+/* ── Alternatives ── */
+#alternatives-panel {
+  padding: 8px 16px; background: #111128; color: #ccc;
+  flex-shrink: 0; font-size: 12px;
+}
+#alternatives-panel.hidden { display: none; }
+#alt-list { list-style: none; display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+#alt-list li { padding: 4px 8px; background: #1e1e3a; border-radius: 4px; }
+
+/* ── Error / geo banners ── */
+#ws-error-msg {
+  padding: 8px 16px; background: #5c1a1a; color: #faa; font-size: 13px; flex-shrink: 0;
+}
+#ws-error-msg.hidden { display: none; }
+
 #geo-error {
-  padding: 10px 16px; background: #c0392b; color: #fff;
+  padding: 8px 16px; background: #c0392b; color: #fff;
   font-size: 13px; flex-shrink: 0;
 }
 #geo-error.hidden { display: none; }

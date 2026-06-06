@@ -67,3 +67,50 @@ class SnapshotEntry(BaseModel):
 class SnapshotMessage(BaseModel):
     type: str = "snapshot"
     ambulances: list[SnapshotEntry]
+
+
+# ── Phase 2 models ─────────────────────────────────────────────────────────────
+
+class Hospital(BaseModel):
+    id: str
+    name: str
+    lat: float
+    lng: float
+
+
+class Incident(BaseModel):
+    id: str
+    type: str            # "congestion" (clearable) | "blockage" (not clearable)
+    lat: float
+    lng: float
+    radius_m: float
+    delay_min: float
+    description: str = ""
+
+
+class HospitalAlternative(BaseModel):
+    name: str
+    lat: float
+    lng: float
+    duration_s: float
+    effective_duration_s: float
+
+
+class SecurityRecommendation(BaseModel):
+    recommended: bool
+    reason: str
+    incident_type: Optional[str] = None
+    estimated_time_saved_s: Optional[float] = None
+    incident_location: Optional[Coord] = None
+
+
+class HospitalRouteMessage(BaseModel):
+    type: str = "hospital_route"
+    ambulance_id: str
+    destination: dict
+    geometry: list[list[float]]
+    distance_m: float
+    duration_s: float
+    effective_duration_s: float
+    alternatives: list[HospitalAlternative]
+    security_recommendation: SecurityRecommendation

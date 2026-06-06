@@ -12,12 +12,43 @@
     <span id="unit-label">Ambulance</span>
     <span id="status-badge" class="badge disconnected">Disconnected</span>
   </div>
+
+  <div id="pickup-bar" class="hidden">
+    <button id="pickup-btn">Patient Picked Up — Find Hospital</button>
+  </div>
+
   <div id="map"></div>
+
   <div id="route-banner" class="hidden">
-    <strong>Route assigned</strong>
+    <strong>En route to pickup</strong>
     <span id="route-eta"></span>
     <span id="route-dist"></span>
   </div>
+
+  <div id="hospital-banner" class="hidden">
+    <div id="hospital-header">
+      <strong>Hospital: </strong><span id="hospital-name"></span>
+    </div>
+    <div id="hospital-times">
+      <span id="hospital-eta"></span>
+      <span id="hospital-delay" class="delay-note hidden"></span>
+    </div>
+    <div id="hospital-dist"></div>
+  </div>
+
+  <div id="security-banner" class="hidden">
+    <div id="security-header">⚠ Security Detail Recommended</div>
+    <div id="security-reason"></div>
+    <div id="security-savings"></div>
+    <button id="request-security-btn">Request Security (advisory)</button>
+  </div>
+
+  <div id="alternatives-panel" class="hidden">
+    <strong>Alternatives</strong>
+    <ul id="alt-list"></ul>
+  </div>
+
+  <div id="ws-error-msg" class="hidden"></div>
   <div id="geo-error" class="hidden">Location permission denied — GPS will not stream.</div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

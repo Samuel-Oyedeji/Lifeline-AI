@@ -1,0 +1,20 @@
+{
+  "incidents": [
+    {
+      "type": "congestion",
+      "lat": 7.3880,
+      "lng": 3.8980,
+      "radius_m": 400,
+      "delay_min": 20,
+      "description": "Market-day congestion near Ring Road"
+    },
+    {
+      "type": "blockage",
+      "lat": 7.3950,
+      "lng": 3.9150,
+      "radius_m": 200,
+      "delay_min": 45,
+      "description": "Fallen trailer blocking Bodija Road"
+    }
+  ]
+}

@@ -14,6 +14,7 @@
       <span id="ws-status" class="badge disconnected">Disconnected</span>
     </div>
 
+    <!-- Dispatch form -->
     <form id="dispatch-form">
       <label>Ambulance
         <select id="amb-select" required>
@@ -40,9 +41,39 @@
 
     <div id="dispatch-result" class="hidden"></div>
 
+    <!-- Active units -->
     <div id="ambulance-list">
       <h3>Active units</h3>
       <ul id="unit-items"></ul>
+    </div>
+
+    <!-- Mock incident panel -->
+    <div id="incident-panel">
+      <div id="incident-panel-header">
+        <h3>Mock Incidents</h3>
+        <button id="clear-all-inc-btn" type="button">Clear all</button>
+      </div>
+
+      <div id="incident-form">
+        <label>Type
+          <select id="inc-type">
+            <option value="congestion">Congestion (clearable)</option>
+            <option value="blockage">Blockage (hard)</option>
+          </select>
+        </label>
+        <label>Delay (min)
+          <input type="number" id="inc-delay" value="20" min="1" max="120" />
+        </label>
+        <label>Radius (m)
+          <input type="number" id="inc-radius" value="300" min="50" max="2000" />
+        </label>
+        <label>Description
+          <input type="text" id="inc-desc" placeholder="optional" />
+        </label>
+        <button id="place-inc-btn" type="button">📍 Click map to place</button>
+      </div>
+
+      <ul id="incident-list"></ul>
     </div>
   </div>
 
