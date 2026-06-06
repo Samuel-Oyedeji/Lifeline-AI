@@ -1,7 +1,7 @@
 # 🚑 LifeLine AI — Predict. Route. Save Lives.
 
 Predictive emergency routing & hospital intelligence for Nigerian cities.
-LifeLine AI doesn't just find the fastest route — it **predicts future congestion**
+LifeLine AI doesn't just find the fastest route it **predicts future congestion**
 and intelligently routes patients to the **best available hospital**.
 
 Built as a dark, glassmorphic, neon-accented operator console — a mix of
@@ -66,7 +66,7 @@ works on any static host (including a bare S3 bucket) with **no rewrite rules**.
    ```
 
    …or just drag the **contents of `dist/`** into the bucket via the console.
-4. **Make it public** (for a hackathon demo)
+4. **Make it public** 
    - *Permissions* → uncheck *Block all public access*
    - Add this bucket policy (replace the bucket name):
 
@@ -88,16 +88,6 @@ works on any static host (including a bare S3 bucket) with **no rewrite rules**.
 
 > **Nicer URLs + HTTPS (optional):** put **CloudFront** in front of the bucket
 > and point your domain at it. Set the default root object to `index.html`.
-
----
-
-## 🔌 Wiring up the real backend later
-
-All mock data lives in [`src/data/hospitals.js`](src/data/hospitals.js) and is
-shaped like an API response. To go live, replace the static arrays with a
-`fetch()` to your AWS endpoint (e.g. API Gateway → Lambda → DynamoDB historical
-traffic model) — the components consume the same shape, so the UI needs no
-changes.
 
 ---
 
