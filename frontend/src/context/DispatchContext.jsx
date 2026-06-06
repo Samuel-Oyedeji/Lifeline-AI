@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { AMBULANCES } from '../data/ambulances.js'
 import { PATIENT_LOCATION } from '../data/hospitals.js'
 
@@ -7,6 +7,7 @@ const DispatchContext = createContext(null)
 
 export function DispatchProvider({ children }) {
   const navigate = useNavigate()
+  const location = useLocation()
 
   // ── Form state ──────────────────────────────────────────────────────────────
   const [dispatch, setDispatch] = useState({
@@ -24,8 +25,9 @@ export function DispatchProvider({ children }) {
   const [liveAmbulances, setLiveAmbulances] = useState(AMBULANCES)
 
   // ── WS message payloads ─────────────────────────────────────────────────────
-  const [pickupRoute,  setPickupRoute]  = useState(null)  // `route` message
-  const [hospitalRoute, setHospitalRoute] = useState(null) // `hospital_route` message
+  const [pickupRoute,     setPickupRoute]     = useState(null)  // `route` message
+  const [preHospitalData, setPreHospitalData] = useState(null)  // `pre_hospital_routes` message
+  const [hospitalRoute,   setHospitalRoute]   = useState(null)  // `hospital_route` message
   const [incidents,    setIncidents]    = useState([])
   const [wsStatus,     setWsStatus]     = useState('connecting')
 
@@ -45,14 +47,23 @@ export function DispatchProvider({ children }) {
 
   // ── WebSocket: /ws/dispatch ─────────────────────────────────────────────────
   const navigateRef = useRef(navigate)
+  const locationRef = useRef(location)
   useEffect(() => { navigateRef.current = navigate })
+  useEffect(() => { locationRef.current = location })
+
+  // Don't redirect when the ambulance driver page is open — it manages its
+  // own WebSocket (/ws/ambulance/:id) and its own route display in-place.
+  function safeNavigate(path) {
+    if (locationRef.current.pathname === '/ambulance') return
+    navigateRef.current(path)
+  }
 
   useEffect(() => {
     let ws
     let timer
 
     function connect() {
-      ws = new WebSocket(`ws://${location.host}/ws/dispatch`)
+      ws = new WebSocket(`ws://${window.location.host}/ws/dispatch`)
 
       ws.onopen = () => setWsStatus('connected')
 
@@ -75,10 +86,15 @@ export function DispatchProvider({ children }) {
           )
         } else if (msg.type === 'route') {
           setPickupRoute(msg)
-          navigateRef.current('/route')
+          safeNavigate('/route')
+        } else if (msg.type === 'pre_hospital_routes') {
+          setPreHospitalData(msg)
         } else if (msg.type === 'hospital_route') {
+          // Use the backend's broadcast directly — same payload the ambulance receives
           setHospitalRoute(msg)
-          navigateRef.current('/hospitals')
+          safeNavigate('/route')
+        } else if (msg.type === 'delivery_complete') {
+          safeNavigate('/summary')
         } else if (msg.type === 'incident_snapshot') {
           setIncidents(msg.incidents)
         }
@@ -108,13 +124,14 @@ export function DispatchProvider({ children }) {
     pickupLatLng, setPickupLatLng,
     liveAmbulances,
     pickupRoute,  setPickupRoute,
+    preHospitalData, setPreHospitalData,
     hospitalRoute, setHospitalRoute,
     incidents,
     wsStatus,
     selectedAmbulance,
   }), [
     dispatch, pickupLatLng, liveAmbulances,
-    pickupRoute, hospitalRoute, incidents, wsStatus, selectedAmbulance,
+    pickupRoute, preHospitalData, hospitalRoute, incidents, wsStatus, selectedAmbulance,
   ])
 
   return <DispatchContext.Provider value={value}>{children}</DispatchContext.Provider>

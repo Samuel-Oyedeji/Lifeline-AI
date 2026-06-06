@@ -1,12 +1,49 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { MapContainer, TileLayer, Polyline, CircleMarker, Tooltip, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Polyline, CircleMarker, Marker, Tooltip, useMap } from 'react-leaflet'
+import L from 'leaflet'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BoltIcon, WarnIcon, CheckIcon } from '../components/Icons.jsx'
+import { AMBULANCES } from '../data/ambulances.js'
 
 const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
 const ATTR = '&copy; OpenStreetMap &copy; CARTO'
 const DEFAULT_CENTER = [6.5095, 3.3711]
+
+const AMBULANCE_ICON = L.divIcon({
+  className: '',
+  iconSize: [40, 40],
+  iconAnchor: [20, 20],
+  tooltipAnchor: [0, -22],
+  html: `
+    <div class="amb-ping-wrap">
+      <span class="amb-ping-ring"></span>
+      <span class="amb-ping-ring" style="animation-delay:0.6s"></span>
+      <span style="font-size:20px;line-height:1;position:relative;z-index:1;filter:drop-shadow(0 0 3px rgba(6,182,212,0.9));">🚑</span>
+    </div>`,
+})
+
+function hospitalIcon(color, isSelected) {
+  const size = isSelected ? 28 : 18
+  const anchor = size / 2
+  return L.divIcon({
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [anchor, anchor],
+    tooltipAnchor: [0, -anchor - 2],
+    html: `<div style="
+      width:${size}px;height:${size}px;
+      background:${color};
+      border-radius:${isSelected ? 8 : 5}px;
+      border:${isSelected ? 2 : 1.5}px solid rgba(255,255,255,${isSelected ? 0.7 : 0.4});
+      display:grid;place-items:center;
+      font-size:${isSelected ? 14 : 9}px;font-weight:900;color:#fff;
+      opacity:${isSelected ? 1 : 0.75};
+      box-shadow:${isSelected ? `0 0 0 3px ${color}44,0 0 18px ${color}88` : 'none'};
+      line-height:1;
+    ">H</div>`,
+  })
+}
 
 const CATEGORY_COLOR = {
   'Teaching Hospital':      '#22C55E',
@@ -86,22 +123,31 @@ function Chip({ color, label }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function AmbulancePage() {
-  const [searchParams] = useSearchParams()
-  const ambulanceId = searchParams.get('id') || 'LAG-A12'
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [ambulanceId,   setAmbulanceId]  = useState(searchParams.get('id') || null)
+  const [selectorQuery, setSelectorQuery] = useState('')
+  const [selectorPick,  setSelectorPick]  = useState(null)
 
   const [wsStatus,     setWsStatus]     = useState('connecting')
-  const [gpsCoords,    setGpsCoords]    = useState(null)      // [lat, lng] — own position
+  const [gpsCoords,    setGpsCoords]    = useState(null)
   const [gpsLabel,     setGpsLabel]     = useState('Acquiring…')
   const [gpsError,     setGpsError]     = useState(false)
-  const [pickupRoute,   setPickupRoute]   = useState(null)   // route WS message
-  const [hospitalRoute, setHospitalRoute] = useState(null)   // hospital_route WS message
-  const [triggering,    setTriggering]    = useState(false)  // sending pickup_complete
+  const [pickupRoute,   setPickupRoute]   = useState(null)
+  const [hospitalRoute, setHospitalRoute] = useState(null)
+  const [preHospitalData, setPreHospitalData] = useState(null)
+  const [triggering,    setTriggering]    = useState(false)
+  const [pickedUp,      setPickedUp]      = useState(false)  // patient has been picked up
   const [toasts,        setToasts]        = useState([])
-  const [allHospitals,  setAllHospitals]  = useState([])     // from lagos_hospitals.json
+  const [allHospitals,  setAllHospitals]  = useState([])
+
+  // ── Route visibility toggles ─────────────────────────────────────────────────
+  const [showPickup,       setShowPickup]       = useState(true)   // red — on by default
+  const [showPickupToHosp, setShowPickupToHosp] = useState(false)  // green — off
+  const [showAmbToHosp,    setShowAmbToHosp]    = useState(false)  // amber — off
 
   const wsRef      = useRef(null)
   const timerRef   = useRef(null)
-  const latLngRef  = useRef(null)   // latest GPS, used to resend on reconnect
+  const latLngRef  = useRef(null)
   const toastIdRef = useRef(0)
 
   function addToast(msg, type = 'success') {
@@ -131,10 +177,21 @@ export default function AmbulancePage() {
 
       if (msg.type === 'route') {
         setPickupRoute(msg)
+        setPreHospitalData(null)
+        setPickedUp(false)
+        // Reset toggles on new dispatch
+        setShowPickup(true)
+        setShowPickupToHosp(false)
+        setShowAmbToHosp(false)
         setTriggering(false)
         addToast('Route received — navigate to patient', 'success')
+      } else if (msg.type === 'pre_hospital_routes') {
+        setPreHospitalData(msg)
+        addToast(`Hospital pre-computed: ${msg.hospital.name}`, 'success')
       } else if (msg.type === 'hospital_route') {
+        // Always apply the backend's authoritative route — keeps driver and dispatch in sync
         setHospitalRoute(msg)
+        setTriggering(false)
         addToast(`Hospital route — ${msg.destination.name}`, 'success')
       } else if (msg.type === 'error') {
         addToast(msg.message ?? 'Backend error', 'error')
@@ -149,12 +206,13 @@ export default function AmbulancePage() {
   }, [ambulanceId])
 
   useEffect(() => {
+    if (!ambulanceId) return
     connectWs()
     return () => {
       clearTimeout(timerRef.current)
       wsRef.current?.close()
     }
-  }, [connectWs])
+  }, [connectWs, ambulanceId])
 
   // ── GPS ─────────────────────────────────────────────────────────────────────
   // ── Hospital data ───────────────────────────────────────────────────────────
@@ -216,31 +274,167 @@ export default function AmbulancePage() {
     return () => navigator.geolocation.clearWatch(watchId)
   }, [])
 
-  // ── Pickup complete ──────────────────────────────────────────────────────────
+  // ── Patient picked up ───────────────────────────────────────────────────────────────
   function sendPickupComplete() {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       addToast('Not connected — please wait', 'error')
       return
     }
-    setTriggering(true)
+
+    setPickedUp(true)
+    setShowPickup(false)
+    setShowPickupToHosp(true)
+    setShowAmbToHosp(true)
+
+    if (preHospitalData?.pickup_to_hospital) {
+      // Show pre-computed route immediately as a preview while backend recomputes
+      setHospitalRoute({
+        destination: {
+          name: preHospitalData.hospital.name,
+          lat:  preHospitalData.hospital.lat,
+          lng:  preHospitalData.hospital.lng,
+        },
+        geometry:             preHospitalData.pickup_to_hospital.geometry,
+        distance_m:           preHospitalData.pickup_to_hospital.distance_m,
+        duration_s:           preHospitalData.pickup_to_hospital.duration_s,
+        effective_duration_s: preHospitalData.pickup_to_hospital.effective_duration_s,
+        security_recommendation: null,
+        alternatives: [],
+      })
+      addToast(`Navigating to ${preHospitalData.hospital.name}`, 'success')
+    } else {
+      setTriggering(true)
+      addToast('Pickup confirmed — computing hospital route…', 'success')
+    }
+
     wsRef.current.send(JSON.stringify({ type: 'pickup_complete' }))
-    addToast('Pickup confirmed — computing hospital route…', 'success')
+  }
+
+  function handleDroppedOff() {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'delivery_complete' }))
+    }
+    addToast('✓ Patient delivered — mission complete!', 'success')
+    setPickedUp(false)
+    setHospitalRoute(null)
+    setPickupRoute(null)
+    setPreHospitalData(null)
+    setShowPickup(true)
+    setShowPickupToHosp(false)
+    setShowAmbToHosp(false)
   }
 
   // ── Derived ─────────────────────────────────────────────────────────────────
-  const geometry   = hospitalRoute?.geometry ?? pickupRoute?.geometry
-  const routeColor = hospitalRoute ? '#22C55E' : '#EF4444'
   const pickupPt   = pickupRoute?.pickup
   const hasRoute   = !!pickupRoute
   const hasHosp    = !!hospitalRoute
   const secRec     = hospitalRoute?.security_recommendation
   const alts       = hospitalRoute?.alternatives ?? []
 
+  // Pre-hospital routes
+  const prePickupToHosp = preHospitalData?.pickup_to_hospital
+  const preAmbToHosp    = preHospitalData?.ambulance_to_hospital
+  const preHospital     = preHospitalData?.hospital
+
+  // Main geometry for FitRoute/FlyTo: hospital route if in hosp phase, else pickup
+  const mainGeometry = hasHosp ? hospitalRoute.geometry : pickupRoute?.geometry
+
   const connColors = { connected: '#22c55e', reconnecting: '#f59e0b', connecting: '#94a3b8', error: '#ef4444' }
   const gpsColor   = gpsError ? '#ef4444' : gpsCoords ? '#22c55e' : '#94a3b8'
 
+  const filteredFleet = selectorQuery.trim()
+    ? AMBULANCES.filter(a =>
+        a.id.toLowerCase().includes(selectorQuery.toLowerCase()) ||
+        a.type.toLowerCase().includes(selectorQuery.toLowerCase()) ||
+        a.plate.toLowerCase().includes(selectorQuery.toLowerCase()) ||
+        a.status.toLowerCase().includes(selectorQuery.toLowerCase())
+      )
+    : AMBULANCES
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#0b1020', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', system-ui, sans-serif", color: '#fff' }}>
+
+      {/* ── Ambulance selector ── */}
+      {!ambulanceId && (
+        <div style={{
+          position: 'fixed', inset: 0, background: '#0b1020', zIndex: 10000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+        }}>
+          <div style={{
+            width: '100%', maxWidth: 420,
+            background: '#0e1426', border: '1px solid rgba(255,255,255,0.10)',
+            borderRadius: 16, padding: '28px 24px',
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: '#06b6d4', marginBottom: 6 }}>
+              LifeLine AI
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Select Your Ambulance</div>
+            <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 20 }}>Type to search or scroll to find your unit</div>
+            <input
+              autoFocus
+              value={selectorQuery}
+              onChange={e => setSelectorQuery(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && selectorPick) { setSearchParams({ id: selectorPick }); setAmbulanceId(selectorPick) } }}
+              placeholder="Search by ID, type or plate…"
+              style={{
+                width: '100%', padding: '11px 13px', marginBottom: 8,
+                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)',
+                borderRadius: 10, color: '#fff', fontSize: 14, outline: 'none',
+              }}
+            />
+            <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {filteredFleet.length === 0 && (
+                <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: '20px 0' }}>
+                  No ambulances match your search
+                </div>
+              )}
+              {filteredFleet.map(a => (
+                <div
+                  key={a.id}
+                  onClick={() => setSelectorPick(a.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
+                    border: `1px solid ${selectorPick === a.id ? 'rgba(6,182,212,0.4)' : 'transparent'}`,
+                    background: selectorPick === a.id ? 'rgba(6,182,212,0.12)' : 'transparent',
+                    transition: 'background 0.12s',
+                  }}
+                >
+                  <span style={{
+                    width: 9, height: 9, borderRadius: '50%', flexShrink: 0,
+                    background: a.status === 'available' ? '#22c55e' : '#f59e0b',
+                  }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#06b6d4' }}>{a.id}</div>
+                    <div style={{ fontSize: 11, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {a.type} · {a.crew} · {a.plate}
+                    </div>
+                  </div>
+                  <span style={{
+                    fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, flexShrink: 0,
+                    background: a.status === 'available' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)',
+                    color: a.status === 'available' ? '#22c55e' : '#f59e0b',
+                  }}>
+                    {a.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <button
+              disabled={!selectorPick}
+              onClick={() => { setSearchParams({ id: selectorPick }); setAmbulanceId(selectorPick) }}
+              style={{
+                width: '100%', marginTop: 16, padding: '13px 20px', border: 'none',
+                borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: selectorPick ? 'pointer' : 'not-allowed',
+                color: '#fff', background: selectorPick ? 'linear-gradient(135deg,#3b82f6,#1d4ed8)' : 'rgba(59,130,246,0.25)',
+                transition: 'background 0.2s',
+              }}
+            >
+              Confirm &amp; Go Online
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Top bar ── */}
       <div style={{
@@ -297,33 +491,48 @@ export default function AmbulancePage() {
           <TileLayer url={DARK_TILES} attribution={ATTR} subdomains="abcd" maxZoom={20} />
 
           {/* Fly to GPS if no route yet */}
-          {gpsCoords && !geometry && <FlyTo coords={gpsCoords} />}
+          {gpsCoords && !mainGeometry && <FlyTo coords={gpsCoords} />}
 
-          {/* Fit to route when received */}
-          {geometry?.length > 1 && <FitRoute positions={geometry} />}
+          {/* Fit map to main route when received */}
+          {mainGeometry?.length > 1 && <FitRoute positions={mainGeometry} />}
 
-          {/* Route polyline */}
-          {geometry?.length > 1 && (
+          {/* Route 1: Ambulance → Patient (red dashed) — toggleable */}
+          {!hasHosp && showPickup && pickupRoute?.geometry?.length > 1 && (
             <Polyline
-              positions={geometry}
-              pathOptions={{
-                color: routeColor,
-                weight: 6,
-                opacity: 0.95,
-                dashArray: hasHosp ? undefined : '8 10',
-              }}
+              positions={pickupRoute.geometry}
+              pathOptions={{ color: '#EF4444', weight: 6, opacity: 0.95, dashArray: '8 10' }}
             />
           )}
 
-          {/* Own position — cyan */}
+          {/* Hospital phase: single green solid route */}
+          {hasHosp && hospitalRoute?.geometry?.length > 1 && (
+            <Polyline
+              positions={hospitalRoute.geometry}
+              pathOptions={{ color: '#22C55E', weight: 6, opacity: 0.95 }}
+            />
+          )}
+
+          {/* Route 2: Pickup → Hospital (green dashed) — toggleable */}
+          {prePickupToHosp?.geometry?.length > 1 && showPickupToHosp && (
+            <Polyline
+              positions={prePickupToHosp.geometry}
+              pathOptions={{ color: '#22C55E', weight: 4, opacity: 0.80, dashArray: '6 8' }}
+            />
+          )}
+
+          {/* Route 3: Ambulance → Hospital direct (amber dashed) — toggleable */}
+          {preAmbToHosp?.geometry?.length > 1 && showAmbToHosp && (
+            <Polyline
+              positions={preAmbToHosp.geometry}
+              pathOptions={{ color: '#F59E0B', weight: 4, opacity: 0.75, dashArray: '4 8' }}
+            />
+          )}
+
+          {/* Own position — ambulance car icon */}
           {gpsCoords && (
-            <CircleMarker
-              center={gpsCoords}
-              radius={11}
-              pathOptions={{ color: '#fff', weight: 2.5, fillColor: '#06B6D4', fillOpacity: 1 }}
-            >
-              <Tooltip direction="top" offset={[0, -10]}>🚑 {ambulanceId}</Tooltip>
-            </CircleMarker>
+            <Marker position={gpsCoords} icon={AMBULANCE_ICON}>
+              <Tooltip direction="top" offset={[0, -4]}>{ambulanceId}</Tooltip>
+            </Marker>
           )}
 
           {/* Patient pickup point — blue */}
@@ -337,159 +546,213 @@ export default function AmbulancePage() {
             </CircleMarker>
           )}
 
-          {/* Nearby hospitals from real Lagos dataset */}
+          {/* Nearby hospitals — H icon markers */}
           {nearbyHospitals.map((h) => {
-            const isSelected = hasHosp && hospitalRoute.destination.name === h.name
-            const baseColor  = CATEGORY_COLOR[h.category] ?? '#22C55E'
+            const isSelected = hasHosp
+              ? hospitalRoute.destination.name === h.name
+              : preHospital?.name === h.name
+            const color = CATEGORY_COLOR[h.category] ?? '#22C55E'
             return (
-              <CircleMarker
+              <Marker
                 key={h.id}
-                center={[h.lat, h.lng]}
-                radius={isSelected ? 12 : 7}
-                pathOptions={{
-                  color: '#fff',
-                  weight: isSelected ? 2.5 : 1,
-                  fillColor: isSelected ? '#22C55E' : baseColor,
-                  fillOpacity: isSelected ? 1 : 0.55,
-                }}
+                position={[h.lat, h.lng]}
+                icon={hospitalIcon(color, isSelected)}
               >
-                <Tooltip
-                  permanent={isSelected}
-                  direction="top"
-                  offset={[0, isSelected ? -12 : -7]}
-                >
-                  🏥 {h.name}
-                  {` · ${h.category}`}
-                  {` · ${h.km.toFixed(1)} km`}
+                <Tooltip permanent={isSelected} direction="top">
+                  {h.name} · {h.category} · {h.km.toFixed(1)} km
                 </Tooltip>
-              </CircleMarker>
+              </Marker>
             )
           })}
         </MapContainer>
 
-        {/* ── Bottom info panel ── */}
+        {/* ── Unified bottom-left column: route panel + action button + hospital card ── */}
         <AnimatePresence>
           {hasRoute && (
             <motion.div
-              initial={{ y: 120, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 120, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 220, damping: 26 }}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ type: 'spring', stiffness: 240, damping: 26 }}
               style={{
-                position: 'absolute', bottom: 0, left: 0, right: 0,
-                background: 'linear-gradient(180deg, transparent 0%, rgba(11,16,32,0.97) 30%)',
-                padding: '36px 14px 16px',
-                zIndex: 500,
-                pointerEvents: 'none',
+                position: 'absolute', bottom: 12, left: 12,
+                zIndex: 500, width: 230,
+                display: 'flex', flexDirection: 'column', gap: 8,
               }}
             >
-              {/* Security banner */}
-              {secRec?.recommended && (
+              {/* Security banner — only when hospital route arrives */}
+              {hasHosp && secRec?.recommended && (
                 <div style={{
-                  pointerEvents: 'auto',
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  background: 'rgba(14,20,38,0.92)',
-                  border: '1px solid rgba(245,158,11,0.55)',
-                  borderRadius: 12, padding: '11px 14px',
-                  color: '#f59e0b', fontSize: 13, marginBottom: 10,
+                  display: 'flex', alignItems: 'flex-start', gap: 8,
+                  background: 'rgba(14,20,38,0.93)',
+                  border: '1px solid rgba(245,158,11,0.5)',
+                  borderRadius: 10, padding: '9px 12px',
+                  color: '#f59e0b', fontSize: 12,
                   backdropFilter: 'blur(16px)',
                 }}>
-                  <WarnIcon style={{ width: 17, height: 17, flexShrink: 0 }} />
-                  <span>
-                    <strong>Security Detail Recommended</strong>
-                    {' '}— ~{Math.round(secRec.estimated_time_saved_s / 60)} min could be saved with escort.
-                  </span>
+                  <WarnIcon style={{ width: 14, height: 14, flexShrink: 0, marginTop: 1 }} />
+                  <span><strong>Security Detail</strong> — ~{Math.round(secRec.estimated_time_saved_s / 60)} min saved with escort</span>
                 </div>
               )}
 
-              {/* Route card */}
+              {/* Hospital info card — slides in when hospital_route arrives */}
+              {hasHosp && (
+                <div style={{
+                  background: 'rgba(11,16,32,0.93)',
+                  border: '1px solid rgba(34,197,94,0.25)',
+                  borderRadius: 14, padding: '12px 14px',
+                  backdropFilter: 'blur(20px)',
+                }}>
+                  <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.1em', color: '#22c55e', textTransform: 'uppercase', marginBottom: 5 }}>
+                    🏥 Route to Hospital
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1.3, marginBottom: 6 }}>
+                    {hospitalRoute.destination.name}
+                  </div>
+                  <div style={{ display: 'flex', gap: 18, marginBottom: alts.length > 0 ? 8 : 0 }}>
+                    <div>
+                      <div style={{ fontSize: 9, color: '#64748b' }}>Distance</div>
+                      <div style={{ fontSize: 16, fontWeight: 700 }}>{(hospitalRoute.distance_m / 1000).toFixed(1)} km</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 9, color: '#64748b' }}>ETA</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: '#f59e0b' }}>{Math.round(hospitalRoute.effective_duration_s / 60)} min</div>
+                    </div>
+                  </div>
+                  {alts.length > 0 && (
+                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                      {alts.map(a => (
+                        <div key={a.name} style={{
+                          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                          borderRadius: 5, padding: '2px 7px', fontSize: 10, color: '#64748b',
+                        }}>
+                          {a.name.split(' ').slice(0,3).join(' ')} · {Math.round(a.effective_duration_s / 60)} min
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Route toggles */}
               <div style={{
-                pointerEvents: 'auto',
-                background: 'rgba(14,20,38,0.92)',
+                background: 'rgba(11,16,32,0.93)',
                 border: '1px solid rgba(255,255,255,0.10)',
-                borderRadius: 14, padding: '14px 16px',
+                borderRadius: 14, padding: '12px 14px',
                 backdropFilter: 'blur(20px)',
               }}>
-                {!hasHosp ? (
-                  <>
-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.07em', color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>
-                      ⬅ Route to Patient
-                    </div>
-                    <div style={{ display: 'flex', gap: 24, marginBottom: 14 }}>
-                      <div>
-                        <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>Distance</div>
-                        <div style={{ fontSize: 20, fontWeight: 700 }}>
-                          {(pickupRoute.distance_m / 1000).toFixed(1)} km
+                <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.1em', color: '#475569', textTransform: 'uppercase', marginBottom: 10 }}>
+                  Routes
+                </div>
+                {[
+                  {
+                    color: '#EF4444',
+                    label: 'To Patient',
+                    sub: pickupRoute
+                      ? `${(pickupRoute.distance_m/1000).toFixed(1)} km · ${Math.round(pickupRoute.duration_s/60)} min`
+                      : null,
+                    active: showPickup,
+                    toggle: () => setShowPickup(v => !v),
+                    alwaysReady: true,
+                  },
+                  {
+                    color: '#22C55E',
+                    label: `Pickup → ${preHospital?.name?.split(' ').slice(0,3).join(' ') ?? (hospitalRoute?.destination?.name?.split(' ').slice(0,3).join(' ') ?? 'Hospital')}`,
+                    sub: prePickupToHosp
+                      ? `${(prePickupToHosp.distance_m/1000).toFixed(1)} km · ${Math.round(prePickupToHosp.effective_duration_s/60)} min`
+                      : hasHosp
+                      ? `${(hospitalRoute.distance_m/1000).toFixed(1)} km · ${Math.round(hospitalRoute.effective_duration_s/60)} min`
+                      : null,
+                    active: showPickupToHosp,
+                    toggle: () => setShowPickupToHosp(v => !v),
+                    alwaysReady: hasHosp,
+                  },
+                  {
+                    color: '#F59E0B',
+                    label: 'Ambulance → Hospital',
+                    sub: preAmbToHosp
+                      ? `${(preAmbToHosp.distance_m/1000).toFixed(1)} km · ${Math.round(preAmbToHosp.duration_s/60)} min`
+                      : null,
+                    active: showAmbToHosp,
+                    toggle: () => setShowAmbToHosp(v => !v),
+                    alwaysReady: false,
+                  },
+                ].map((row) => {
+                  const loading = !row.alwaysReady && !preHospitalData
+                  return (
+                    <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <span style={{
+                        width: 22, height: 3, borderRadius: 2, flexShrink: 0,
+                        backgroundImage: `repeating-linear-gradient(90deg,${row.color} 0,${row.color} 5px,transparent 5px,transparent 10px)`,
+                        opacity: row.active ? 1 : 0.25,
+                      }} />
+                      <div style={{ flex: 1, minWidth: 0, opacity: row.active ? 1 : 0.45 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {row.label}
                         </div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>ETA</div>
-                        <div style={{ fontSize: 20, fontWeight: 700, color: '#22c55e' }}>
-                          {Math.round(pickupRoute.duration_s / 60)} min
-                        </div>
-                      </div>
-                    </div>
-                    <motion.button
-                      style={{
-                        width: '100%', padding: '14px 20px', border: 'none',
-                        borderRadius: 10, fontSize: 15, fontWeight: 600,
-                        cursor: triggering ? 'not-allowed' : 'pointer',
-                        color: '#fff', display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', gap: 8,
-                        background: triggering
-                          ? 'rgba(34,197,94,0.4)'
-                          : 'linear-gradient(135deg,#22c55e,#16a34a)',
-                      }}
-                      whileHover={triggering ? undefined : { scale: 1.01 }}
-                      whileTap={triggering ? undefined : { scale: 0.98 }}
-                      onClick={sendPickupComplete}
-                      disabled={triggering}
-                    >
-                      {triggering
-                        ? <><span className="spinner" style={{ marginRight: 8 }} />Computing hospital route…</>
-                        : <><CheckIcon style={{ width: 18, height: 18 }} />Patient Picked Up</>
-                      }
-                    </motion.button>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.07em', color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>
-                      🏥 Route to Hospital
-                    </div>
-                    <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 10 }}>
-                      {hospitalRoute.destination.name}
-                    </div>
-                    <div style={{ display: 'flex', gap: 24, marginBottom: 10 }}>
-                      <div>
-                        <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>Distance</div>
-                        <div style={{ fontSize: 20, fontWeight: 700 }}>
-                          {(hospitalRoute.distance_m / 1000).toFixed(1)} km
-                        </div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>ETA (with incidents)</div>
-                        <div style={{ fontSize: 20, fontWeight: 700, color: '#f59e0b' }}>
-                          {Math.round(hospitalRoute.effective_duration_s / 60)} min
-                        </div>
-                      </div>
-                    </div>
-                    {alts.length > 0 && (
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        {alts.map(a => (
-                          <div key={a.name} style={{
-                            background: 'rgba(255,255,255,0.04)',
-                            border: '1px solid rgba(255,255,255,0.09)',
-                            borderRadius: 8, padding: '5px 11px',
-                            fontSize: 12, color: '#94a3b8',
-                          }}>
-                            {a.name} · {Math.round(a.effective_duration_s / 60)} min
+                        {loading ? (
+                          <div style={{ fontSize: 10, color: '#475569', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span className="spinner" style={{ width: 8, height: 8, borderWidth: 1.5 }} /> computing…
                           </div>
-                        ))}
+                        ) : row.sub ? (
+                          <div style={{ fontSize: 10, color: '#64748b' }}>{row.sub}</div>
+                        ) : null}
                       </div>
-                    )}
-                  </>
-                )}
+                      <div
+                        onClick={row.toggle}
+                        style={{
+                          width: 32, height: 17, borderRadius: 9, flexShrink: 0,
+                          background: row.active ? row.color : 'rgba(255,255,255,0.12)',
+                          cursor: 'pointer', position: 'relative',
+                          transition: 'background 0.2s',
+                          opacity: loading ? 0.4 : 1,
+                          pointerEvents: loading ? 'none' : 'auto',
+                        }}
+                      >
+                        <div style={{
+                          width: 13, height: 13, borderRadius: 7, background: '#fff',
+                          position: 'absolute', top: 2,
+                          left: row.active ? 17 : 2,
+                          transition: 'left 0.18s',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                        }} />
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
+
+              {/* Action button — same width as panel */}
+              <motion.button
+                onClick={pickedUp ? handleDroppedOff : sendPickupComplete}
+                disabled={triggering && !pickedUp}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.97 }}
+                style={{
+                  width: '100%', padding: '11px 16px', border: 'none',
+                  borderRadius: 12, fontSize: 13, fontWeight: 700,
+                  cursor: (triggering && !pickedUp) ? 'not-allowed' : 'pointer',
+                  color: '#fff', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', gap: 7,
+                  background: pickedUp
+                    ? 'linear-gradient(135deg,#3b82f6,#1d4ed8)'
+                    : (triggering && !pickedUp)
+                    ? 'rgba(34,197,94,0.35)'
+                    : 'linear-gradient(135deg,#22c55e,#16a34a)',
+                  backdropFilter: 'blur(12px)',
+                  boxShadow: pickedUp
+                    ? '0 4px 20px rgba(59,130,246,0.35)'
+                    : '0 4px 20px rgba(34,197,94,0.35)',
+                  transition: 'background 0.3s',
+                }}
+              >
+                {triggering && !pickedUp
+                  ? <><span className="spinner" style={{ marginRight: 6 }} />Computing route…</>
+                  : pickedUp
+                  ? <><CheckIcon style={{ width: 16, height: 16 }} />Patient Dropped Off</>
+                  : <><CheckIcon style={{ width: 16, height: 16 }} />Patient Picked Up</>
+                }
+              </motion.button>
             </motion.div>
           )}
         </AnimatePresence>

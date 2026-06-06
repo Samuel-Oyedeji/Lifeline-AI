@@ -10,6 +10,7 @@ class AmbulanceConnection:
     ambulance_id: str
     last_position: Optional[dict] = None   # {lat, lng, heading, ts}
     current_route: Optional[dict] = None
+    last_pickup: Optional[dict] = None     # {lat, lng} — patient pickup coords from /dispatch
 
 
 class ConnectionRegistry:

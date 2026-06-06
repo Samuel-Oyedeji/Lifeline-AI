@@ -5,7 +5,7 @@ const NAV = [
   { to: '/', label: 'Emergency Details', step: '01', Icon: DispatchIcon, end: true },
   { to: '/ambulances', label: 'Assign Unit', step: '02', Icon: AmbulanceIcon },
   { to: '/route', label: 'Route to Patient', step: '03', Icon: RouteIcon },
-  { to: '/hospitals', label: 'Hospital Recommendation', step: '04', Icon: HospitalIcon },
+  // { to: '/hospitals', label: 'Hospital Recommendation', step: '04', Icon: HospitalIcon },
   { to: '/summary', label: 'Mission Complete', step: '05', Icon: FlagIcon },
 ]
 
@@ -27,13 +27,6 @@ export default function Sidebar() {
         </NavLink>
       ))}
 
-      <div className="sidebar-foot">
-        <strong style={{ color: 'var(--text-dim)' }}>Operator Console</strong>
-        <br />
-        Lagos Emergency Grid · v1.0
-        <br />
-        AWS · S3 · Lambda · DynamoDB
-      </div>
     </aside>
   )
 }

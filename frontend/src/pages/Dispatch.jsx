@@ -1,17 +1,13 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { MapContainer, TileLayer, CircleMarker, Tooltip, useMapEvents, useMap } from 'react-leaflet'
 import { useDispatch } from '../context/DispatchContext.jsx'
 import { EMERGENCY_TYPES, PRIORITIES } from '../data/hospitals.js'
-import { BoltIcon, CheckIcon, PinIcon } from '../components/Icons.jsx'
+import { kmBetween, etaMinutes } from '../data/ambulances.js'
+import { BoltIcon, PinIcon, PulseIcon, AmbulanceIcon } from '../components/Icons.jsx'
+import AccidentNewsPanel from '../components/AccidentNewsPanel.jsx'
 
-const STEPS = [
-  'Locating Nearest Ambulance',
-  'Analyzing Hospitals',
-  'Checking Traffic',
-  'Predicting Congestion',
-]
 
 const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
 const ATTR = '&copy; OpenStreetMap &copy; CARTO'
@@ -83,11 +79,17 @@ function useGeocode(query) {
 
 export default function Dispatch() {
   const navigate = useNavigate()
-  const { dispatch, setDispatch, pickupLatLng, setPickupLatLng } = useDispatch()
+  const { dispatch, setDispatch, pickupLatLng, setPickupLatLng, liveAmbulances } = useDispatch()
   const [analyzing, setAnalyzing] = useState(false)
-  const [stepDone, setStepDone] = useState(-1)
 
   const set = (patch) => setDispatch((d) => ({ ...d, ...patch }))
+
+  const fleet = useMemo(() =>
+    liveAmbulances
+      .map((a) => ({ ...a, distanceKm: kmBetween(a.coords, pickupLatLng), etaMin: etaMinutes(kmBetween(a.coords, pickupLatLng)) }))
+      .sort((a, b) => a.distanceKm - b.distanceKm),
+    [liveAmbulances, pickupLatLng]
+  )
 
   const { result: geoResult, status: geoStatus } = useGeocode(dispatch.patientLocation)
 
@@ -98,11 +100,7 @@ export default function Dispatch() {
 
   function runAnalysis() {
     setAnalyzing(true)
-    setStepDone(-1)
-    STEPS.forEach((_, i) => {
-      setTimeout(() => setStepDone(i), 700 * (i + 1))
-    })
-    setTimeout(() => navigate('/ambulances'), 700 * (STEPS.length + 1))
+    setTimeout(() => navigate('/ambulances'), 3500)
   }
 
   const geoIndicator = {
@@ -115,7 +113,7 @@ export default function Dispatch() {
 
   return (
     <motion.div className="scroll" {...pageMotion}>
-      <div className="page-head">
+      <div className="page-head" style={{ position: 'relative' }}>
         <span className="chip" style={{ marginBottom: 14 }}>
           <span className="dot" style={{ background: 'var(--critical)' }} /> EMERGENCY DISPATCH
         </span>
@@ -123,6 +121,16 @@ export default function Dispatch() {
           Dispatch with <span className="grad-text">predictive intelligence</span>
         </h1>
         <p>Log the emergency. LifeLine AI predicts congestion and routes to the best hospital.</p>
+
+        <a
+          href="/#/ambulance"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="sim-btn"
+        >
+          <AmbulanceIcon style={{ width: 15, height: 15 }} />
+          Simulate Ambulance
+        </a>
       </div>
 
       <div className="grid-2">
@@ -232,19 +240,7 @@ export default function Dispatch() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.12 }}
         >
-          <div className="glass card">
-            <span className="label">What happens next</span>
-            <p style={{ color: 'var(--text-dim)', fontSize: 14.5, lineHeight: 1.7, marginTop: 12 }}>
-              On dispatch, LifeLine AI scores every nearby hospital on bed and ICU availability,
-              specialist match, live ETA, and <strong style={{ color: '#fff' }}>predicted</strong>{' '}
-              congestion — not just current traffic.
-            </p>
-            <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
-              <span className="chip">🏥 15 hospitals monitored</span>
-              <span className="chip">📡 Live traffic grid</span>
-              <span className="chip">🔮 6-min forecast</span>
-            </div>
-          </div>
+          <AccidentNewsPanel />
 
           <div className="grid-3" style={{ gridTemplateColumns: '1fr 1fr' }}>
             <div className="glass stat">
@@ -265,81 +261,57 @@ export default function Dispatch() {
         </motion.div>
       </div>
 
-      {/* Pickup location map */}
+      {/* Nearby units grid */}
       <motion.div
-        className="glass"
-        style={{ marginTop: 22, borderRadius: 14, overflow: 'hidden' }}
+        style={{ marginTop: 22 }}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        <div style={{ padding: '12px 16px 10px', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <PinIcon style={{ width: 16, height: 16, color: 'var(--secondary)' }} />
-          <span className="label" style={{ margin: 0 }}>
-            Pickup location — type above to geocode, or click map to pin
-          </span>
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-dim)', fontVariantNumeric: 'tabular-nums' }}>
-            {pickupLatLng[0].toFixed(5)}, {pickupLatLng[1].toFixed(5)}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 12 }}>
+          <AmbulanceIcon style={{ width: 15, height: 15, color: 'var(--secondary)' }} />
+          <span className="label" style={{ margin: 0 }}>Nearby Units</span>
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-faint)' }}>
+            {fleet.filter(a => a.status === 'available').length} available
           </span>
         </div>
-        <div style={{ height: 260 }}>
-          <MapContainer center={pickupLatLng} zoom={14} scrollWheelZoom={true} zoomControl={false}>
-            <TileLayer url={DARK_TILES} attribution={ATTR} subdomains="abcd" maxZoom={20} />
-            <RecenterMap coords={pickupLatLng} />
-            <PickupPicker onPick={setPickupLatLng} />
-            <CircleMarker
-              center={pickupLatLng}
-              radius={10}
-              pathOptions={{ color: '#fff', weight: 2, fillColor: '#3B82F6', fillOpacity: 1 }}
-            >
-              <Tooltip permanent direction="top" offset={[0, -10]}>
-                📍 {dispatch.patientLocation || 'Patient'}
-              </Tooltip>
-            </CircleMarker>
-          </MapContainer>
+        <div className="unit-grid">
+          {fleet.map((a) => {
+            const busy = a.status === 'busy' || a.status === 'offline'
+            const statusColor = a.status === 'available' ? 'var(--success)' : a.status === 'offline' ? 'var(--text-faint)' : 'var(--warning)'
+            const statusLabel = a.status === 'available' ? 'Available' : a.status === 'offline' ? 'Offline' : 'On call'
+            return (
+              <div key={a.id} className={'glass unit-card' + (busy ? ' unit-card--busy' : '')}>
+                <div className="uc-head">
+                  <span className="uc-id">{a.id}</span>
+                  <span className="uc-status" style={{ color: statusColor }}>● {statusLabel}</span>
+                </div>
+                <div className="uc-type">{a.type === 'Advanced Life Support' ? 'ALS' : 'BLS'} · {a.crew}</div>
+                <div className="uc-metrics">
+                  <span>{a.distanceKm.toFixed(1)} km</span>
+                  <span style={{ color: 'var(--text-faint)' }}>·</span>
+                  <span style={{ color: 'var(--secondary)' }}>{a.etaMin} min ETA</span>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </motion.div>
 
-      {/* Analyzing overlay */}
+      {/* Dispatch loader overlay */}
       {analyzing && (
         <motion.div className="analyze-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <motion.div
-            className="glass analyze-card"
-            initial={{ opacity: 0, scale: 0.92, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ type: 'spring', stiffness: 240, damping: 22 }}
-          >
-            <h3>
-              <span className="grad-text">LifeLine AI</span> is thinking…
-            </h3>
-            <p className="sub">Crunching live traffic, bed availability & congestion forecasts.</p>
-
-            {STEPS.map((label, i) => {
-              const done = stepDone >= i
-              const isCurrent = !done && (i === 0 ? stepDone < 0 : stepDone === i - 1)
-              return (
-                <div key={label} className={'step-row ' + (done ? 'done' : isCurrent ? '' : 'idle')}>
-                  <span className="step-ic">
-                    {done ? (
-                      <motion.span
-                        className="check"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: 'spring', stiffness: 400, damping: 18 }}
-                      >
-                        <CheckIcon style={{ width: 16, height: 16 }} />
-                      </motion.span>
-                    ) : isCurrent ? (
-                      <span className="spinner" />
-                    ) : (
-                      <span className="pending" />
-                    )}
-                  </span>
-                  <span className="step-label">{label}…</span>
-                </div>
-              )
-            })}
-          </motion.div>
+          <div className="dispatch-loader">
+            <div className="dl-rings">
+              <span className="dl-ring" />
+              <span className="dl-ring" />
+              <span className="dl-ring" />
+              <div className="dl-core">
+                <PulseIcon style={{ width: 26, height: 26, color: '#fff' }} />
+              </div>
+            </div>
+            <p className="dl-label">Dispatching…</p>
+          </div>
         </motion.div>
       )}
     </motion.div>
