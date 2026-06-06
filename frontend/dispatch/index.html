@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dispatch Centre</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <h2>Dispatch Centre</h2>
+      <span id="ws-status" class="badge disconnected">Disconnected</span>
+    </div>
+
+    <form id="dispatch-form">
+      <label>Ambulance
+        <select id="amb-select" required>
+          <option value="">Loading…</option>
+        </select>
+      </label>
+
+      <label>Pickup point
+        <div id="pickup-coords">Click map to set</div>
+        <input type="hidden" id="pickup-lat" />
+        <input type="hidden" id="pickup-lng" />
+      </label>
+
+      <label>Patient name (optional)
+        <input type="text" id="patient-name" placeholder="—" />
+      </label>
+
+      <label>Notes (optional)
+        <textarea id="patient-notes" rows="2" placeholder="—"></textarea>
+      </label>
+
+      <button type="submit" id="send-btn">Send Dispatch</button>
+    </form>
+
+    <div id="dispatch-result" class="hidden"></div>
+
+    <div id="ambulance-list">
+      <h3>Active units</h3>
+      <ul id="unit-items"></ul>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

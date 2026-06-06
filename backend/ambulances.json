@@ -1,0 +1,7 @@
+{
+  "ambulances": [
+    { "id": "AMB-001", "label": "Unit 1" },
+    { "id": "AMB-002", "label": "Unit 2" },
+    { "id": "AMB-003", "label": "Unit 3" }
+  ]
+}

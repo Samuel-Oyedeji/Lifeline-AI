@@ -1,0 +1,70 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; display: flex; height: 100vh; overflow: hidden; }
+
+/* ── Sidebar ── */
+#sidebar {
+  width: 300px; flex-shrink: 0; display: flex; flex-direction: column;
+  background: #1a1a2e; color: #eee; overflow-y: auto;
+}
+
+#sidebar-header {
+  padding: 14px 16px; border-bottom: 1px solid #2c2c4e;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+#sidebar-header h2 { font-size: 16px; font-weight: 700; flex: 1; }
+
+.badge {
+  padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;
+}
+.badge.connected    { background: #27ae60; }
+.badge.disconnected { background: #c0392b; }
+.badge.reconnecting { background: #e67e22; }
+
+/* ── Form ── */
+#dispatch-form {
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+  border-bottom: 1px solid #2c2c4e;
+}
+#dispatch-form label {
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 12px; color: #aaa; font-weight: 500;
+}
+#dispatch-form select,
+#dispatch-form input[type="text"],
+#dispatch-form textarea {
+  background: #252545; color: #eee; border: 1px solid #3c3c5c;
+  border-radius: 6px; padding: 6px 8px; font-size: 13px;
+}
+#pickup-coords {
+  background: #252545; color: #7ec8e3; border: 1px solid #3c3c5c;
+  border-radius: 6px; padding: 6px 8px; font-size: 12px; cursor: default;
+}
+#send-btn {
+  margin-top: 4px; padding: 9px; background: #2980b9; color: #fff;
+  border: none; border-radius: 6px; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: background 0.15s;
+}
+#send-btn:hover { background: #1a6fa0; }
+#send-btn:disabled { background: #555; cursor: not-allowed; }
+
+/* ── Result banner ── */
+#dispatch-result {
+  margin: 12px 16px; padding: 10px; border-radius: 6px; font-size: 13px;
+}
+#dispatch-result.success { background: #1a5c3a; border: 1px solid #27ae60; }
+#dispatch-result.error   { background: #5c1a1a; border: 1px solid #c0392b; }
+#dispatch-result.hidden  { display: none; }
+
+/* ── Active units list ── */
+#ambulance-list {
+  padding: 12px 16px; flex: 1;
+}
+#ambulance-list h3 { font-size: 13px; color: #aaa; margin-bottom: 8px; }
+#unit-items { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+#unit-items li {
+  font-size: 13px; padding: 6px 10px; background: #252545;
+  border-radius: 6px; border-left: 4px solid var(--color, #2980b9);
+}
+
+/* ── Map ── */
+#map { flex: 1; min-height: 0; }

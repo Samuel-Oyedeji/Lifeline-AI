@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ambulance Unit</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="header">
+    <span id="unit-label">Ambulance</span>
+    <span id="status-badge" class="badge disconnected">Disconnected</span>
+  </div>
+  <div id="map"></div>
+  <div id="route-banner" class="hidden">
+    <strong>Route assigned</strong>
+    <span id="route-eta"></span>
+    <span id="route-dist"></span>
+  </div>
+  <div id="geo-error" class="hidden">Location permission denied — GPS will not stream.</div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
