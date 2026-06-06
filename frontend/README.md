@@ -1,8 +1,11 @@
 # Ambulance Dispatch — Phase 1 + 2
 
-Real-time ambulance dispatch with:
-- **Flow #1** — fastest route from ambulance to patient pickup (Phase 1)
-- **Flow #2** — best hospital after pickup, with incident-aware routing and security-detail recommendations (Phase 2)
+Predictive emergency routing & hospital intelligence for Nigerian cities.
+LifeLine AI doesn't just find the fastest route it **predicts future congestion**
+and intelligently routes patients to the **best available hospital**.
+
+Built as a dark, glassmorphic, neon-accented operator console — a mix of
+**Uber + Google Maps + a medical dashboard**.
 
 ---
 
@@ -125,30 +128,46 @@ Ambulance WebSocket messages (send):
 
 ## Architecture
 
-```
-browser (ambulance)              browser (dispatch)
-      │  ws /ws/ambulance/{id}         │  ws /ws/dispatch
-      │                                │
-      └──────────── FastAPI ───────────┘
-                    │
-           routing.py   → OSRM demo (route + table)
-           hospitals.py → Overpass API (OSM hospital data)
-           traffic.py   → MockIncidentStore (injectable)
-           ai_layer.py  → choose_route + choose_hospital_route
-           registry.py  → in-memory connection state
-```
+1. **Create a bucket** (globally-unique name), e.g. `lifeline-ai-demo`.
+2. **Enable static website hosting**
+   - S3 → your bucket → *Properties* → *Static website hosting* → **Enable**
+   - Index document: `index.html`
+   - Error document: `index.html` (HashRouter handles routing client-side)
+3. **Upload the build**
+
+   ```bash
+   npm run build
+   aws s3 sync dist/ s3://lifeline-ai-demo --delete
+   ```
+
+   …or just drag the **contents of `dist/`** into the bucket via the console.
+4. **Make it public** 
+   - *Permissions* → uncheck *Block all public access*
+   - Add this bucket policy (replace the bucket name):
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Sid": "PublicRead",
+         "Effect": "Allow",
+         "Principal": "*",
+         "Action": "s3:GetObject",
+         "Resource": "arn:aws:s3:::lifeline-ai-demo/*"
+       }
+     ]
+   }
+   ```
+5. Open the **bucket website endpoint** URL. Done. 🎉
+
+> **Nicer URLs + HTTPS (optional):** put **CloudFront** in front of the bucket
+> and point your domain at it. Set the default root object to `index.html`.
 
 ---
 
-## Phase 3 / next steps (not built)
+## 🎨 Design system
 
-| Item | Notes |
-|------|-------|
-| **Real traffic feed** | Replace `MockIncidentStore` with a live provider behind the same interface |
-| **Hospital capacity/specialty** | Filter and weight by available ER beds and trauma level before travel-time ranking |
-| **Auto-recompute on deviation** | Detect ambulance going off-route and re-trigger the pipeline |
-| **Actual security dispatch** | The "Request Security" button is a stub seam; wire it to a real dispatch service |
-| **Route recomputation (live incidents)** | Re-run pipeline when a new incident lands on an active route |
-| **Auth + persistent DB** | JSON config and in-memory state are placeholders |
-| **Multi-server scaling** | Single process; add Redis pub-sub for horizontal scaling |
-| **OSRM self-hosted** | Demo server is rate-limited; self-hosted OSRM or Valhalla for production |
+Tokens are defined as CSS variables in [`src/index.css`](src/index.css):
+`--bg`, `--primary`, `--secondary`, `--success`, `--warning`, `--critical`, etc.
+Change them in one place to re-theme the whole app.
