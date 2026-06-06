@@ -28,7 +28,7 @@ export default function TopNav() {
       <div className="topnav-right">
         <span className={`live-pill ${cls}`}>
           <span className="dot" />
-          {label}
+          <span className="live-pill-label">{label}</span>
         </span>
         <span className="topnav-sep" />
         <div className="avatar-wrap">

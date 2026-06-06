@@ -1165,3 +1165,204 @@
     display: none;
   }
 }
+
+/* ============================================================
+   Mobile — sidebar becomes bottom nav bar
+   ============================================================ */
+@media (max-width: 768px) {
+  /* Shell: 3 rows — topnav / main / bottom-nav */
+  .shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: 56px 1fr 60px;
+    grid-template-areas:
+      'nav'
+      'main'
+      'side';
+  }
+
+  /* Bottom navigation bar */
+  .sidebar {
+    flex-direction: row;
+    padding: 0 4px;
+    border-right: none;
+    border-top: 1px solid var(--glass-border);
+    overflow-y: visible;
+    overflow-x: hidden;
+    justify-content: space-around;
+    align-items: stretch;
+    gap: 0;
+  }
+  .nav-item {
+    flex-direction: column;
+    gap: 3px;
+    padding: 6px 4px 4px;
+    flex: 1;
+    justify-content: center;
+    align-items: center;
+    min-width: 0;
+    border-radius: 8px;
+    font-size: 9px;
+    text-align: center;
+  }
+  .nav-label {
+    display: block;
+    font-size: 9px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 60px;
+    line-height: 1.2;
+  }
+  .nav-step {
+    display: none;
+  }
+  .nav-item.active::before {
+    left: 6px;
+    right: 6px;
+    top: 0;
+    bottom: auto;
+    width: auto;
+    height: 2px;
+    border-radius: 0 0 2px 2px;
+  }
+  .nav-item .ico {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+  }
+
+  /* TopNav */
+  .topnav {
+    padding: 0 12px;
+  }
+  .brand-tag {
+    display: none;
+  }
+  .topnav-sep {
+    display: none;
+  }
+
+  /* Main scroll — extra bottom padding for bottom nav */
+  .scroll {
+    padding: 16px 14px 88px;
+  }
+
+  /* Page headings */
+  .page-head h1 {
+    font-size: 22px;
+  }
+
+  /* Sim button — de-absolute so it doesn't overlap heading */
+  .sim-btn {
+    position: static;
+    display: inline-flex;
+    margin-top: 10px;
+    width: auto;
+    font-size: 11px;
+    padding: 7px 11px;
+  }
+
+  /* Grids */
+  .grid-2,
+  .reco-grid {
+    grid-template-columns: 1fr;
+  }
+  .grid-3,
+  .summary-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+  .unit-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Summary */
+  .success-hero {
+    padding: 28px 18px;
+  }
+  .success-hero h1 {
+    font-size: 26px;
+  }
+  .score-ring {
+    width: 100px;
+    height: 100px;
+  }
+  .score-ring .score-num {
+    font-size: 28px;
+  }
+  .reasons {
+    grid-template-columns: 1fr;
+  }
+
+  /* Ambulance reco section */
+  .amb-id {
+    font-size: 22px;
+  }
+
+  /* Map overlays (RouteView) */
+  .map-overlays {
+    flex-wrap: wrap;
+    top: 12px;
+    left: 12px;
+    gap: 8px;
+    max-width: calc(100vw - 24px);
+  }
+  .float-card {
+    min-width: 90px;
+    padding: 10px 12px;
+  }
+  .float-card .fc-v {
+    font-size: 20px;
+  }
+
+  /* AI alert — move to bottom on mobile */
+  .ai-alert {
+    top: auto;
+    bottom: 70px;
+    right: 8px;
+    left: 8px;
+    width: auto;
+  }
+
+  /* Map legend */
+  .map-legend {
+    bottom: 12px;
+    left: 12px;
+    padding: 8px 12px;
+    font-size: 11px;
+  }
+
+  /* Reroute / status bar */
+  .reroute-bar {
+    bottom: 8px;
+    right: 8px;
+    left: 8px;
+    justify-content: center;
+  }
+}
+
+/* ============================================================
+   Small phones — hide live pill label text
+   ============================================================ */
+@media (max-width: 480px) {
+  .live-pill-label {
+    display: none;
+  }
+  .live-pill {
+    padding: 6px 8px;
+    gap: 0;
+  }
+  .topnav-right {
+    gap: 8px;
+  }
+  .brand-name {
+    font-size: 15px;
+  }
+  .grid-3,
+  .summary-metrics {
+    grid-template-columns: 1fr;
+  }
+  .unit-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
