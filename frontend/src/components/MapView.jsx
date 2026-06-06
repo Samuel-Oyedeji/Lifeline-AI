@@ -50,6 +50,14 @@ function makeAmbulanceIcon() {
   })
 }
 
+const CATEGORY_COLOR = {
+  'Teaching Hospital':      '#22C55E',
+  'Federal Medical Center': '#22C55E',
+  'General Hospital':       '#4ade80',
+  'Specialist Hospital':    '#06B6D4',
+  'Medical Center':         '#38bdf8',
+}
+
 export default function MapView({
   geometry,          // primary route geometry (array of [lat,lng])
   routeColor = '#22C55E',
@@ -58,7 +66,8 @@ export default function MapView({
   tertiaryGeometry,  // optional tertiary route (amber route from ambulance direct to hospital)
   tertiaryColor = '#F59E0B',
   patientCoords,
-  hospital,
+  hospital,          // selected/destination hospital { name, lat, lng }
+  hospitals = [],    // nearby hospital list [{ id, name, lat, lng, category, km }]
   ambulanceCoords,   // [lat, lng] of ambulance (dispatcher's live position)
   ambulanceLabel = 'Ambulance',
   incidents = [],
@@ -145,8 +154,31 @@ export default function MapView({
         </CircleMarker>
       )}
 
-      {/* Hospital destination */}
-      {hospital && (
+      {/* Nearby hospitals list */}
+      {hospitals.map((h) => {
+        const isSelected = hospital?.name === h.name
+        const baseColor = CATEGORY_COLOR[h.category] ?? '#22C55E'
+        return (
+          <CircleMarker
+            key={h.id}
+            center={[h.lat, h.lng]}
+            radius={isSelected ? 12 : 7}
+            pathOptions={{
+              color: '#fff',
+              weight: isSelected ? 2.5 : 1,
+              fillColor: isSelected ? '#22C55E' : baseColor,
+              fillOpacity: isSelected ? 1 : 0.55,
+            }}
+          >
+            <Tooltip permanent={isSelected} direction="top" offset={[0, isSelected ? -12 : -7]}>
+              🏥 {h.name}{h.km != null ? ` · ${h.km.toFixed(1)} km` : ''}
+            </Tooltip>
+          </CircleMarker>
+        )
+      })}
+
+      {/* Hospital destination (when no hospitals list, or to ensure selected shows on top) */}
+      {hospital && hospitals.length === 0 && (
         <CircleMarker
           center={[hospital.lat, hospital.lng]}
           radius={10}

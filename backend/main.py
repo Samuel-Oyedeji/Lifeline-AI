@@ -1,8 +1,14 @@
 import asyncio
 import json
 import math
+import os
+from datetime import datetime, timezone
 from pathlib import Path
 
+import httpx
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).parent / ".env")
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.staticfiles import StaticFiles
 
@@ -61,6 +67,95 @@ app = FastAPI(title="Ambulance Dispatch")
 
 # ── HTTP endpoints ────────────────────────────────────────────────────────────
 
+_SAMPLE_ARTICLES = [
+    {
+        "title": "Multiple injured in Lagos-Ibadan Expressway pile-up",
+        "description": "Emergency services responded to a multi-vehicle collision on the Lagos-Ibadan Expressway near Sagamu interchange. Three vehicles were involved; six persons were treated on site.",
+        "url": "#",
+        "source": "Punch Nigeria",
+        "publishedAt": "2026-06-06T07:14:00Z",
+        "image": None,
+    },
+    {
+        "title": "Tanker explosion causes road closure on Third Mainland Bridge",
+        "description": "A petrol tanker overturned and caught fire early Friday morning, prompting authorities to close both lanes of the Third Mainland Bridge for several hours.",
+        "url": "#",
+        "source": "Vanguard",
+        "publishedAt": "2026-06-05T22:41:00Z",
+        "image": None,
+    },
+    {
+        "title": "FRSC records 12 fatalities in Ogun road crashes this week",
+        "description": "The Federal Road Safety Corps Ogun State Command has recorded 12 fatalities and 30 injuries across seven separate road traffic crashes between Monday and Friday.",
+        "url": "#",
+        "source": "The Guardian Nigeria",
+        "publishedAt": "2026-06-05T17:05:00Z",
+        "image": None,
+    },
+    {
+        "title": "Pedestrian knocked down on Apapa-Oshodi Expressway",
+        "description": "A pedestrian was struck by a speeding vehicle while attempting to cross the Apapa-Oshodi Expressway near the Iganmu flyover. The victim was rushed to LUTH.",
+        "url": "#",
+        "source": "Channels TV",
+        "publishedAt": "2026-06-05T11:28:00Z",
+        "image": None,
+    },
+    {
+        "title": "Lagos emergency services respond to 47 road incidents in May",
+        "description": "Data released by the Lagos State Emergency Management Agency shows 47 road traffic incidents were responded to in May 2026, a 12% decrease from April figures.",
+        "url": "#",
+        "source": "BusinessDay",
+        "publishedAt": "2026-06-04T09:00:00Z",
+        "image": None,
+    },
+]
+
+_GNEWS_URL = "https://gnews.io/api/v4/search"
+
+
+@app.get("/api/news")
+async def get_news():
+    api_key = os.environ.get("GNEWS_API_KEY", "").strip()
+    if not api_key:
+        print("[NEWS] No GNEWS_API_KEY set — serving sample data")
+        return {"articles": _SAMPLE_ARTICLES, "live": False}
+
+    print(f"[NEWS] Fetching live news (key ...{api_key[-6:]})")
+    params = {
+        "q": "road accident crash emergency",
+        "lang": "en",
+        "country": "ng",
+        "max": 10,
+        "sortby": "publishedAt",
+        "token": api_key,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(_GNEWS_URL, params=params)
+        print(f"[NEWS] GNews status: {resp.status_code}")
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("errors"):
+            print(f"[NEWS] GNews API error: {data['errors']}")
+            return {"articles": _SAMPLE_ARTICLES, "live": False}
+        articles = [
+            {
+                "title": a["title"],
+                "description": a.get("description", ""),
+                "url": a.get("url", "#"),
+                "source": a.get("source", {}).get("name", ""),
+                "publishedAt": a.get("publishedAt", ""),
+                "image": a.get("image"),
+            }
+            for a in data.get("articles", [])
+        ]
+        print(f"[NEWS] Got {len(articles)} articles")
+        return {"articles": articles, "live": True}
+    except Exception as exc:
+        print(f"[NEWS] Error fetching news: {exc}")
+        return {"articles": _SAMPLE_ARTICLES, "live": False}
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -106,6 +201,7 @@ async def dispatch(payload: DispatchRequest):
     }
 
     if conn:  # only push to ambulance device if it's actually connected
+        conn.last_pickup = {"lat": payload.pickup.lat, "lng": payload.pickup.lng}
         await registry.push_to_ambulance(payload.ambulance_id, route_msg)
     await registry.broadcast_to_dispatch(route_msg)
 
@@ -274,11 +370,18 @@ async def trigger_hospital(ambulance_id: str):
 async def _run_hospital_pipeline(ambulance_id: str) -> dict:
     """Full pickup→hospital pipeline. Returns the hospital_route payload dict."""
     conn = registry.get(ambulance_id)
-    if not conn or not conn.last_position:
-        return {"type": "error", "code": "no_gps", "message": "No GPS position — cannot compute hospital route"}
+    if not conn:
+        return {"type": "error", "code": "no_gps", "message": "Ambulance not connected"}
 
-    pos = conn.last_position
-    origin = Coord(lat=pos["lat"], lng=pos["lng"])
+    # Use the stored pickup location as the hospital-search origin so the
+    # selected hospital always matches what the pre-pipeline computed.
+    # Fall back to live GPS only if no pickup was stored (e.g. /api/trigger-hospital call).
+    if conn.last_pickup:
+        origin = Coord(lat=conn.last_pickup["lat"], lng=conn.last_pickup["lng"])
+    elif conn.last_position:
+        origin = Coord(lat=conn.last_position["lat"], lng=conn.last_position["lng"])
+    else:
+        return {"type": "error", "code": "no_gps", "message": "No GPS position — cannot compute hospital route"}
 
     # 1. Find nearby hospitals from local dataset (same source as the driver map)
     hospitals = _find_hospitals_local(origin)
@@ -378,6 +481,13 @@ async def ws_ambulance(websocket: WebSocket, ambulance_id: str):
                 if payload.get("type") == "hospital_route":
                     await registry.broadcast_to_dispatch(payload)
 
+            elif data.get("type") == "delivery_complete":
+                print(f"[DELIVERY] {ambulance_id} — patient delivered")
+                await registry.broadcast_to_dispatch({
+                    "type": "delivery_complete",
+                    "ambulance_id": ambulance_id,
+                })
+
     except WebSocketDisconnect:
         pass
     except Exception as e:
@@ -420,9 +530,6 @@ async def ws_dispatch(websocket: WebSocket):
 
 # ── Static files ──────────────────────────────────────────────────────────────
 
-# Driver device page (plain HTML, GPS streaming)
-app.mount("/ambulance", StaticFiles(directory=str(FRONTEND_DIR / "ambulance"), html=True), name="ambulance")
-app.mount("/shared",    StaticFiles(directory=str(FRONTEND_DIR / "shared")),               name="shared")
 
 # React dispatch console (served last — catch-all at root)
 _REACT_DIST = FRONTEND_DIR / "dist"

@@ -196,34 +196,31 @@ export default function Ambulances() {
             >
               <div className="amb-card-head">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <AmbulanceIcon
-                    style={{ width: 20, height: 20, color: busy ? 'var(--text-faint)' : 'var(--secondary)' }}
-                  />
+                  <div className="amb-card-ico">
+                    <AmbulanceIcon style={{ width: 17, height: 17, color: busy ? 'var(--text-faint)' : 'var(--secondary)' }} />
+                  </div>
                   <span className="amb-card-id">{a.id}</span>
                 </div>
-                <span
-                  className="chip"
-                  style={{
-                    color: busy ? 'var(--text-faint)' : 'var(--success)',
-                    borderColor: busy ? 'var(--glass-border)' : 'rgba(34,197,94,0.4)',
-                  }}
-                >
-                  {a.status === 'offline' ? '● Offline' : busy ? '● On call' : '● Available'}
+                <span className={'amb-card-badge' + (busy ? ' amb-card-badge--busy' : '')}>
+                  {a.status === 'offline' ? 'Offline' : busy ? 'On call' : 'Available'}
                 </span>
               </div>
 
-              <div className="amb-card-sub">{a.type} · {a.crew}</div>
+              <div className="amb-card-sub">
+                <span className="amb-card-type">{a.type === 'Advanced Life Support' ? 'ALS' : 'BLS'}</span>
+                {a.crew}
+              </div>
 
               <div className="amb-card-metrics">
-                <div>
-                  <span className="hm-k">Distance</span>
-                  <div className="hm-v" style={{ fontSize: 16 }}>{a.distanceKm.toFixed(1)} km</div>
+                <div className="amb-card-metric">
+                  <span className="acm-k">Distance</span>
+                  <span className="acm-v">{a.distanceKm.toFixed(1)} km</span>
                 </div>
-                <div>
-                  <span className="hm-k">ETA</span>
-                  <div className="hm-v" style={{ fontSize: 16, color: busy ? 'var(--text-dim)' : 'var(--success)' }}>
+                <div className="amb-card-metric">
+                  <span className="acm-k">ETA</span>
+                  <span className="acm-v" style={{ color: busy ? 'var(--text-faint)' : 'var(--success)' }}>
                     {busy ? '—' : `${a.etaMin} min`}
-                  </div>
+                  </span>
                 </div>
               </div>
 
@@ -236,7 +233,7 @@ export default function Ambulances() {
               </div>
 
               <button
-                className={'btn ' + (isSel ? '' : 'btn-ghost')}
+                className={'amb-card-btn' + (isSel ? ' amb-card-btn--sel' : '') + (busy ? ' amb-card-btn--busy' : '')}
                 disabled={busy}
                 onClick={(e) => {
                   e.stopPropagation()
@@ -244,14 +241,8 @@ export default function Ambulances() {
                 }}
               >
                 {isSel ? (
-                  <>
-                    <CheckIcon style={{ width: 17, height: 17 }} /> Selected
-                  </>
-                ) : busy ? (
-                  'Unavailable'
-                ) : (
-                  'Select Unit'
-                )}
+                  <><CheckIcon style={{ width: 14, height: 14 }} /> Selected</>
+                ) : busy ? 'Unavailable' : 'Select Unit'}
               </button>
             </motion.div>
           )

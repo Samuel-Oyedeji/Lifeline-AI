@@ -4,7 +4,6 @@ import { useLocation } from 'react-router-dom'
 
 import TopNav from './components/TopNav.jsx'
 import Sidebar from './components/Sidebar.jsx'
-import StatusWidget from './components/StatusWidget.jsx'
 
 import Dispatch from './pages/Dispatch.jsx'
 import Ambulances from './pages/Ambulances.jsx'
@@ -25,8 +24,6 @@ export default function App() {
     )
   }
 
-  const onRoutePage = location.pathname.startsWith('/route')
-
   return (
     <div className="shell">
       <TopNav />
@@ -42,7 +39,7 @@ export default function App() {
           </Routes>
         </AnimatePresence>
       </main>
-      {!onRoutePage && <StatusWidget />}
+
     </div>
   )
 }

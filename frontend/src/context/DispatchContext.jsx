@@ -90,8 +90,11 @@ export function DispatchProvider({ children }) {
         } else if (msg.type === 'pre_hospital_routes') {
           setPreHospitalData(msg)
         } else if (msg.type === 'hospital_route') {
+          // Use the backend's broadcast directly — same payload the ambulance receives
           setHospitalRoute(msg)
-          safeNavigate('/hospitals')
+          safeNavigate('/route')
+        } else if (msg.type === 'delivery_complete') {
+          safeNavigate('/summary')
         } else if (msg.type === 'incident_snapshot') {
           setIncidents(msg.incidents)
         }
