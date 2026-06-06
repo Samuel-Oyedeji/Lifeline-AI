@@ -1,14 +1,15 @@
+import asyncio
 import json
+import math
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.staticfiles import StaticFiles
 
-from models import DispatchRequest, DispatchResponse, Coord
+from models import DispatchRequest, DispatchResponse, Coord, Hospital
 from registry import registry
 from routing import get_candidate_routes, hospital_durations, RoutingError
 from ai_layer import choose_route, choose_hospital_route, NoRouteAvailable
-from hospitals import find_nearby_hospitals, HospitalError
 from traffic import incident_store
 
 BASE_DIR = Path(__file__).parent
@@ -18,6 +19,37 @@ with open(BASE_DIR / "ambulances.json") as f:
     _ambulances_data = json.load(f)
 
 KNOWN_IDS: set[str] = {a["id"] for a in _ambulances_data["ambulances"]}
+
+# Load the same hospital dataset that the frontend map displays.
+# This replaces live Overpass queries — same data, zero network dependency.
+_HOSP_JSON = FRONTEND_DIR / "public" / "nigeria_hospitals.json"
+with open(_HOSP_JSON) as f:
+    _local_hospitals: list[dict] = json.load(f)["hospitals"]
+
+
+def _find_hospitals_local(origin: Coord, limit: int = 20) -> list[Hospital]:
+    """Return the `limit` closest hospitals to `origin` using haversine distance.
+
+    Uses the bundled nigeria_hospitals.json — identical to what the driver map shows.
+    """
+    def _hav(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+        R = 6_371_000
+        dlat = math.radians(lat2 - lat1)
+        dlng = math.radians(lng2 - lng1)
+        a = (math.sin(dlat / 2) ** 2
+             + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2))
+             * math.sin(dlng / 2) ** 2)
+        return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    ranked = sorted(
+        _local_hospitals,
+        key=lambda h: _hav(origin.lat, origin.lng, h["lat"], h["lng"]),
+    )
+    return [
+        Hospital(id=str(h["id"]), name=h["name"], lat=h["lat"], lng=h["lng"])
+        for h in ranked[:limit]
+    ]
+
 
 # Seed incidents from file
 with open(BASE_DIR / "mock_incidents.json") as f:
@@ -77,12 +109,116 @@ async def dispatch(payload: DispatchRequest):
         await registry.push_to_ambulance(payload.ambulance_id, route_msg)
     await registry.broadcast_to_dispatch(route_msg)
 
+    # Fire-and-forget: pre-compute hospital routes from the pickup location so
+    # the driver sees all 3 routes immediately without waiting for pickup_complete.
+    asyncio.create_task(
+        _run_pre_hospital_pipeline(payload.ambulance_id, origin, payload.pickup)
+    )
+
     return DispatchResponse(
         status="dispatched",
         ambulance_id=payload.ambulance_id,
         duration_s=route.duration_s,
         distance_m=route.distance_m,
     )
+
+
+# ── Pre-hospital pipeline (triggered at dispatch time) ───────────────────────
+
+async def _run_pre_hospital_pipeline(
+    ambulance_id: str,
+    ambulance_origin: Coord,
+    pickup: Coord,
+) -> None:
+    """Compute pickup→hospital and ambulance→hospital routes at dispatch time.
+
+    Sends a 'pre_hospital_routes' WS message so the driver sees all 3 routes
+    on the map before even reaching the patient.
+    """
+    print(f"[PRE-HOSP] {ambulance_id} — computing hospital routes from pickup")
+    try:
+        # 1. Find hospitals near the PICKUP point from local dataset
+        hospitals = _find_hospitals_local(pickup)
+        if not hospitals:
+            print(f"[PRE-HOSP] No hospitals found near pickup")
+            return
+
+        # 2. Rank cheaply with OSRM Table
+        hospital_coords = [Coord(lat=h.lat, lng=h.lng) for h in hospitals]
+        try:
+            durations = await hospital_durations(pickup, hospital_coords)
+        except RoutingError as e:
+            print(f"[PRE-HOSP] RoutingError (table): {e}")
+            return
+
+        paired = [(h, d) for h, d in zip(hospitals, durations) if d is not None]
+        paired.sort(key=lambda x: x[1])
+        top3 = [h for h, _ in paired[:3]]
+
+        # 3. Full candidate routes pickup → each finalist
+        finalists_data = []
+        for h in top3:
+            try:
+                routes = await get_candidate_routes(pickup, Coord(lat=h.lat, lng=h.lng))
+                if routes:
+                    finalists_data.append({"hospital": h, "routes": routes})
+            except RoutingError:
+                pass
+
+        if not finalists_data:
+            print(f"[PRE-HOSP] No routes to any hospital")
+            return
+
+        # 4. AI picks the best hospital + route
+        try:
+            decision = choose_hospital_route(finalists_data, incident_store, context={})
+        except NoRouteAvailable as e:
+            print(f"[PRE-HOSP] NoRouteAvailable: {e}")
+            return
+
+        hospital          = decision["hospital"]
+        pickup_to_hosp    = decision["route"]
+        effective_dur     = decision["effective_duration_s"]
+
+        # 5. Also compute ambulance → hospital (direct route)
+        amb_to_hosp_data = None
+        try:
+            amb_routes = await get_candidate_routes(
+                ambulance_origin, Coord(lat=hospital.lat, lng=hospital.lng)
+            )
+            if amb_routes:
+                best_amb = choose_route(amb_routes, context={})
+                amb_to_hosp_data = {
+                    "geometry": best_amb.geometry,
+                    "distance_m": best_amb.distance_m,
+                    "duration_s": best_amb.duration_s,
+                }
+        except (RoutingError, NoRouteAvailable):
+            pass  # optional route — skip on failure
+
+        payload = {
+            "type": "pre_hospital_routes",
+            "ambulance_id": ambulance_id,
+            "hospital": {
+                "name": hospital.name,
+                "lat": hospital.lat,
+                "lng": hospital.lng,
+            },
+            "pickup_to_hospital": {
+                "geometry": pickup_to_hosp.geometry,
+                "distance_m": pickup_to_hosp.distance_m,
+                "duration_s": pickup_to_hosp.duration_s,
+                "effective_duration_s": effective_dur,
+            },
+            "ambulance_to_hospital": amb_to_hosp_data,
+        }
+
+        print(f"[PRE-HOSP] {ambulance_id} → {hospital.name} ready, pushing routes")
+        await registry.push_to_ambulance(ambulance_id, payload)
+        await registry.broadcast_to_dispatch(payload)
+
+    except Exception as e:
+        print(f"[PRE-HOSP] Unexpected error for {ambulance_id}: {e}")
 
 
 # ── Mock incident CRUD ────────────────────────────────────────────────────────
@@ -144,14 +280,10 @@ async def _run_hospital_pipeline(ambulance_id: str) -> dict:
     pos = conn.last_position
     origin = Coord(lat=pos["lat"], lng=pos["lng"])
 
-    # 1. Find nearby hospitals
-    try:
-        hospitals = await find_nearby_hospitals(origin)
-    except HospitalError as e:
-        return {"type": "error", "code": "hospital_error", "message": str(e)}
-
+    # 1. Find nearby hospitals from local dataset (same source as the driver map)
+    hospitals = _find_hospitals_local(origin)
     if not hospitals:
-        return {"type": "error", "code": "no_hospitals", "message": "No hospitals found within search radius"}
+        return {"type": "error", "code": "no_hospitals", "message": "No hospitals found in local dataset"}
 
     # 2. Rank hospitals cheaply with OSRM Table → top 3 finalists
     hospital_coords = [Coord(lat=h.lat, lng=h.lng) for h in hospitals]

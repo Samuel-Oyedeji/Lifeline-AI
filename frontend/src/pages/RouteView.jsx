@@ -14,16 +14,34 @@ const pageMotion = {
 
 export default function RouteView() {
   const navigate = useNavigate()
-  const { pickupRoute, hospitalRoute, pickupLatLng, selectedAmbulance, incidents } = useDispatch()
+  const {
+    pickupRoute,
+    hospitalRoute,
+    pickupLatLng,
+    selectedAmbulance,
+    incidents,
+    liveAmbulances,
+  } = useDispatch()
   const [triggering, setTriggering] = useState(false)
   const [triggerError, setTriggerError] = useState(null)
 
-  // Showing hospital route after patient pickup; pickup route otherwise
+  // Phase logic
   const isHospitalPhase = !!hospitalRoute
 
-  const geometry = isHospitalPhase ? hospitalRoute.geometry : pickupRoute?.geometry
-  const routeColor = isHospitalPhase ? '#22C55E' : '#EF4444'
+  // ── Route geometries ──────────────────────────────────────────────────────
+  // During pickup phase: show the red dashed route to patient as primary
+  // During hospital phase: show both — red pickup route + green hospital route
+  const pickupGeometry = pickupRoute?.geometry
+  const hospitalGeometry = hospitalRoute?.geometry
 
+  // Primary = what we fit the map to on transition
+  const primaryGeometry = isHospitalPhase ? hospitalGeometry : pickupGeometry
+
+  // Colors
+  const pickupColor = '#EF4444'
+  const hospitalColor = '#22C55E'
+
+  // Metrics — show pickup stats until hospital route arrives, then hospital stats
   const etaMin = isHospitalPhase
     ? Math.round(hospitalRoute.effective_duration_s / 60)
     : pickupRoute
@@ -36,10 +54,18 @@ export default function RouteView() {
     ? (pickupRoute.distance_m / 1000).toFixed(1)
     : '—'
 
+  // Pickup distance / eta for the secondary route card (shown in hospital phase)
+  const pickupEtaMin  = pickupRoute ? Math.round(pickupRoute.duration_s / 60) : '—'
+  const pickupDistKm  = pickupRoute ? (pickupRoute.distance_m / 1000).toFixed(1) : '—'
+
   const congestionIncidents = incidents.filter((i) => i.type === 'congestion')
 
+  // Ambulance live coords from fleet (fallback: null)
+  const ambulanceCoords = selectedAmbulance?.coords ?? null
+  const ambulanceLabel  = selectedAmbulance?.id ?? 'Ambulance'
+
   // Show loading state while waiting for the WS route message
-  if (!geometry) {
+  if (!primaryGeometry) {
     return (
       <motion.div
         style={{
@@ -80,16 +106,23 @@ export default function RouteView() {
     <motion.div style={{ position: 'absolute', inset: 0 }} {...pageMotion}>
       <div className="map-wrap">
         <MapView
-          geometry={geometry}
-          routeColor={routeColor}
+          /* During pickup phase: red dashed primary, no secondary
+             During hospital phase: red pickup as primary, green hospital as secondary */
+          geometry={pickupGeometry}
+          routeColor={pickupColor}
+          secondaryGeometry={isHospitalPhase ? hospitalGeometry : undefined}
+          secondaryColor={hospitalColor}
           patientCoords={pickupLatLng}
           hospital={isHospitalPhase ? hospitalRoute.destination : null}
+          ambulanceCoords={ambulanceCoords}
+          ambulanceLabel={ambulanceLabel}
           incidents={incidents}
         />
       </div>
 
       {/* Floating metric cards (top-left) */}
       <div className="map-overlays">
+        {/* Main ETA / Distance card */}
         {[
           { k: isHospitalPhase ? 'Hospital ETA' : 'Pickup ETA', v: `${etaMin} min`, c: '#fff' },
           { k: 'Distance', v: `${distanceKm} km`, c: 'var(--secondary)' },
@@ -105,6 +138,46 @@ export default function RouteView() {
             <div className="fc-v" style={{ color: card.c }}>{card.v}</div>
           </motion.div>
         ))}
+
+        {/* During hospital phase: also show pickup leg stats */}
+        {isHospitalPhase && pickupRoute && (
+          <motion.div
+            className="glass float-card"
+            initial={{ opacity: 0, y: -14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            style={{ borderColor: 'rgba(239,68,68,0.35)' }}
+          >
+            <div className="fc-k" style={{ color: '#EF4444' }}>Pickup Leg</div>
+            <div className="fc-v" style={{ color: '#EF4444', fontSize: 13 }}>
+              {pickupDistKm} km · {pickupEtaMin} min
+            </div>
+          </motion.div>
+        )}
+      </div>
+
+      {/* Route legend (bottom-left area, above action bar) */}
+      <div className="glass map-legend">
+        <div className="lg-row">
+          <span className="swatch" style={{ background: pickupColor }} />
+          Route to patient
+        </div>
+        {isHospitalPhase && (
+          <div className="lg-row">
+            <span className="swatch" style={{ background: hospitalColor }} />
+            Route to hospital
+          </div>
+        )}
+        {incidents.filter((i) => i.type === 'congestion').length > 0 && (
+          <div className="lg-row">
+            <span className="swatch" style={{ background: '#F59E0B' }} /> Congestion zone
+          </div>
+        )}
+        {incidents.filter((i) => i.type === 'blockage').length > 0 && (
+          <div className="lg-row">
+            <span className="swatch" style={{ background: '#EF4444' }} /> Road blockage
+          </div>
+        )}
       </div>
 
       {/* AI alert panel (right) */}
@@ -146,24 +219,6 @@ export default function RouteView() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Legend */}
-      <div className="glass map-legend">
-        <div className="lg-row">
-          <span className="swatch" style={{ background: routeColor }} />
-          {isHospitalPhase ? 'Route to hospital' : 'Route to patient'}
-        </div>
-        {incidents.filter((i) => i.type === 'congestion').length > 0 && (
-          <div className="lg-row">
-            <span className="swatch" style={{ background: '#F59E0B' }} /> Congestion zone
-          </div>
-        )}
-        {incidents.filter((i) => i.type === 'blockage').length > 0 && (
-          <div className="lg-row">
-            <span className="swatch" style={{ background: '#EF4444' }} /> Road blockage
-          </div>
-        )}
-      </div>
 
       {/* Action bar */}
       <div className="reroute-bar">

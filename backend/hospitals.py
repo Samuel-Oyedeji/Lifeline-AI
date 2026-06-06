@@ -80,7 +80,15 @@ async def _fetch(lat: float, lng: float, radius: int) -> list[Hospital]:
     query = _overpass_query(lat, lng, radius)
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-            resp = await client.post(OVERPASS_URL, data={"data": query})
+            resp = await client.post(
+                OVERPASS_URL,
+                data={"data": query},
+                headers={
+                    "Accept": "*/*",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "User-Agent": "LifeLineAI/1.0 ambulance-dispatch",
+                },
+            )
             resp.raise_for_status()
             data = resp.json()
     except httpx.TimeoutException as e:
