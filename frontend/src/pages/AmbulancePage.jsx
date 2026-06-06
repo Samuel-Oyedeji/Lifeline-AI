@@ -159,25 +159,27 @@ export default function AmbulancePage() {
   // ── GPS ─────────────────────────────────────────────────────────────────────
   // ── Hospital data ───────────────────────────────────────────────────────────
   useEffect(() => {
-    fetch('/lagos_hospitals.json')
+    fetch('/nigeria_hospitals.json')
       .then(r => r.json())
       .then(data => setAllHospitals(data.hospitals))
       .catch(() => {})
   }, [])
 
-  // 20 nearest hospitals to the patient pickup point (or Lagos default).
-  // Deliberately NOT using gpsCoords — the driver may be outside Lagos,
-  // but the patient and hospitals are always in the Lagos area.
+  // 20 nearest hospitals. Priority: GPS location → pickup point → Lagos default.
+  // No radius filter — always show 20 nearest so drivers outside Lagos still see hospitals.
   const nearbyHospitals = useMemo(() => {
     if (!allHospitals.length) return []
     const pickup = pickupRoute?.pickup
-    const [clat, clng] = pickup ? [pickup.lat, pickup.lng] : DEFAULT_CENTER
+    const [clat, clng] = gpsCoords
+      ? gpsCoords
+      : pickup
+      ? [pickup.lat, pickup.lng]
+      : DEFAULT_CENTER
     return allHospitals
       .map(h => ({ ...h, km: kmBetween(clat, clng, h.lat, h.lng) }))
-      .filter(h => h.km < 15)
       .sort((a, b) => a.km - b.km)
       .slice(0, 20)
-  }, [allHospitals, pickupRoute])
+  }, [allHospitals, pickupRoute, gpsCoords])
 
   // ── GPS ─────────────────────────────────────────────────────────────────────
   useEffect(() => {

@@ -8,6 +8,11 @@ export const AMBULANCES = [
   { id: 'LAG-D03', coords: [6.4998, 3.3550], status: 'busy',      type: 'Advanced Life Support', crew: 'Paramedic + EMT', plate: 'AGL-552-KD' },
   { id: 'LAG-E15', coords: [6.5310, 3.3789], status: 'available', type: 'Basic Life Support',    crew: 'EMT x2',          plate: 'IKD-330-RE' },
   { id: 'LAG-F09', coords: [6.4885, 3.3702], status: 'busy',      type: 'Advanced Life Support', crew: 'Paramedic + EMT', plate: 'SUR-741-MF' },
+  { id: 'IBD-A01', coords: [7.3850, 3.9520], status: 'available', type: 'Advanced Life Support', crew: 'Paramedic + EMT', plate: 'OYO-112-AA' },
+  { id: 'IBD-B02', coords: [7.3700, 3.9400], status: 'available', type: 'Basic Life Support',    crew: 'EMT x2',          plate: 'OYO-334-BA' },
+  { id: 'IBD-C03', coords: [7.3920, 3.9610], status: 'available', type: 'Advanced Life Support', crew: 'Paramedic + EMT', plate: 'OYO-567-CA' },
+  { id: 'IBD-D04', coords: [7.3650, 3.9580], status: 'busy',      type: 'Basic Life Support',    crew: 'EMT x2',          plate: 'OYO-789-DA' },
+  { id: 'IBD-E05', coords: [7.3800, 3.9320], status: 'available', type: 'Advanced Life Support', crew: 'Paramedic + EMT', plate: 'OYO-901-EA' },
 ]
 
 // Haversine distance in km between two [lat, lng] points.

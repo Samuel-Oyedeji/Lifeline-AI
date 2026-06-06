@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { MapContainer, TileLayer, CircleMarker, Tooltip, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, CircleMarker, Tooltip, useMapEvents, useMap } from 'react-leaflet'
 import { useDispatch } from '../context/DispatchContext.jsx'
 import { EMERGENCY_TYPES, PRIORITIES } from '../data/hospitals.js'
 import { BoltIcon, CheckIcon, PinIcon } from '../components/Icons.jsx'
@@ -28,6 +28,59 @@ function PickupPicker({ onPick }) {
   return null
 }
 
+// Flies the map to new coords whenever they change
+function RecenterMap({ coords }) {
+  const map = useMap()
+  const prev = useRef(null)
+  useEffect(() => {
+    if (!coords) return
+    const [lat, lng] = coords
+    if (prev.current && prev.current[0] === lat && prev.current[1] === lng) return
+    prev.current = coords
+    map.flyTo([lat, lng], 15, { duration: 1.4 })
+  }, [coords, map])
+  return null
+}
+
+// Nominatim geocoding with 600 ms debounce
+function useGeocode(query) {
+  const [result, setResult] = useState(null)   // { lat, lng } | null
+  const [status, setStatus] = useState('idle') // idle | searching | found | notfound | error
+  const timerRef = useRef(null)
+
+  useEffect(() => {
+    const q = query?.trim()
+    if (!q || q.length < 3) {
+      setStatus('idle')
+      return
+    }
+
+    clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(async () => {
+      setStatus('searching')
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=ng`
+        const res = await fetch(url, { headers: { 'Accept-Language': 'en' } })
+        const data = await res.json()
+        if (data.length > 0) {
+          setResult({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) })
+          setStatus('found')
+        } else {
+          setResult(null)
+          setStatus('notfound')
+        }
+      } catch {
+        setResult(null)
+        setStatus('error')
+      }
+    }, 600)
+
+    return () => clearTimeout(timerRef.current)
+  }, [query])
+
+  return { result, status }
+}
+
 export default function Dispatch() {
   const navigate = useNavigate()
   const { dispatch, setDispatch, pickupLatLng, setPickupLatLng } = useDispatch()
@@ -35,6 +88,13 @@ export default function Dispatch() {
   const [stepDone, setStepDone] = useState(-1)
 
   const set = (patch) => setDispatch((d) => ({ ...d, ...patch }))
+
+  const { result: geoResult, status: geoStatus } = useGeocode(dispatch.patientLocation)
+
+  // Apply geocoded result to pickup coords
+  useEffect(() => {
+    if (geoResult) setPickupLatLng([geoResult.lat, geoResult.lng])
+  }, [geoResult, setPickupLatLng])
 
   function runAnalysis() {
     setAnalyzing(true)
@@ -44,6 +104,14 @@ export default function Dispatch() {
     })
     setTimeout(() => navigate('/ambulances'), 700 * (STEPS.length + 1))
   }
+
+  const geoIndicator = {
+    idle:       null,
+    searching:  <span className="spinner" style={{ width: 14, height: 14 }} />,
+    found:      <span style={{ color: 'var(--success)', fontSize: 13 }}>✓</span>,
+    notfound:   <span style={{ color: 'var(--warning)', fontSize: 13 }}>?</span>,
+    error:      <span style={{ color: 'var(--critical)', fontSize: 13 }}>!</span>,
+  }[geoStatus]
 
   return (
     <motion.div className="scroll" {...pageMotion}>
@@ -80,12 +148,31 @@ export default function Dispatch() {
               />
               <input
                 className="input"
-                style={{ paddingLeft: 42 }}
+                style={{ paddingLeft: 42, paddingRight: 36 }}
                 value={dispatch.patientLocation}
                 onChange={(e) => set({ patientLocation: e.target.value })}
-                placeholder="Enter patient location"
+                placeholder="Type an address or landmark…"
               />
+              {geoIndicator && (
+                <span style={{
+                  position: 'absolute', right: 12, top: '50%',
+                  transform: 'translateY(-50%)',
+                  display: 'flex', alignItems: 'center',
+                }}>
+                  {geoIndicator}
+                </span>
+              )}
             </div>
+            {geoStatus === 'notfound' && (
+              <p style={{ color: 'var(--warning)', fontSize: 12, marginTop: 4 }}>
+                Location not found — click the map to pin manually.
+              </p>
+            )}
+            {geoStatus === 'found' && (
+              <p style={{ color: 'var(--text-dim)', fontSize: 12, marginTop: 4 }}>
+                {pickupLatLng[0].toFixed(5)}, {pickupLatLng[1].toFixed(5)}
+              </p>
+            )}
           </div>
 
           <div className="field">
@@ -189,15 +276,16 @@ export default function Dispatch() {
         <div style={{ padding: '12px 16px 10px', display: 'flex', alignItems: 'center', gap: 10 }}>
           <PinIcon style={{ width: 16, height: 16, color: 'var(--secondary)' }} />
           <span className="label" style={{ margin: 0 }}>
-            Click map to pin exact pickup location
+            Pickup location — type above to geocode, or click map to pin
           </span>
-          <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--text-dim)' }}>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-dim)', fontVariantNumeric: 'tabular-nums' }}>
             {pickupLatLng[0].toFixed(5)}, {pickupLatLng[1].toFixed(5)}
           </span>
         </div>
         <div style={{ height: 260 }}>
           <MapContainer center={pickupLatLng} zoom={14} scrollWheelZoom={true} zoomControl={false}>
             <TileLayer url={DARK_TILES} attribution={ATTR} subdomains="abcd" maxZoom={20} />
+            <RecenterMap coords={pickupLatLng} />
             <PickupPicker onPick={setPickupLatLng} />
             <CircleMarker
               center={pickupLatLng}
@@ -205,7 +293,7 @@ export default function Dispatch() {
               pathOptions={{ color: '#fff', weight: 2, fillColor: '#3B82F6', fillOpacity: 1 }}
             >
               <Tooltip permanent direction="top" offset={[0, -10]}>
-                Patient · {dispatch.patientLocation}
+                📍 {dispatch.patientLocation || 'Patient'}
               </Tooltip>
             </CircleMarker>
           </MapContainer>
