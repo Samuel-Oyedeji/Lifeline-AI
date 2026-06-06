@@ -13,7 +13,6 @@ const pageMotion = {
 
 const SPARK_COLORS = ['#3B82F6', '#06B6D4', '#22C55E', '#F59E0B', '#EF4444']
 
-// Deterministic spark layout (no random in render) for the confetti burst.
 const SPARKS = Array.from({ length: 22 }, (_, i) => ({
   left: (i * 4.6 + 4) % 100,
   delay: (i % 7) * 0.12,
@@ -23,15 +22,22 @@ const SPARKS = Array.from({ length: 22 }, (_, i) => ({
 
 export default function Summary() {
   const navigate = useNavigate()
-  const { dispatch, selectedHospital, selectedAmbulance } = useDispatch()
+  const { dispatch, selectedAmbulance, pickupRoute, hospitalRoute } = useDispatch()
 
   const emergency = EMERGENCY_TYPES.find((e) => e.id === dispatch.emergencyType)
   const priority = PRIORITIES.find((p) => p.id === dispatch.priority)
 
+  const hospitalName = hospitalRoute?.destination?.name ?? 'Hospital'
+  const pickupEta = pickupRoute ? Math.round(pickupRoute.duration_s / 60) : '—'
+  const hospitalEta = hospitalRoute ? Math.round(hospitalRoute.effective_duration_s / 60) : '—'
+  const totalDistKm = hospitalRoute
+    ? ((pickupRoute?.distance_m ?? 0) / 1000 + hospitalRoute.distance_m / 1000).toFixed(1)
+    : '—'
+
   const metrics = [
-    { k: 'Hospital Selected', v: selectedHospital.short, c: '#fff' },
-    { k: 'Time Saved', v: '4 min', c: 'var(--success)' },
-    { k: 'Predicted Delay Avoided', v: '5 min', c: 'var(--warning)' },
+    { k: 'Hospital Selected', v: hospitalName, c: '#fff' },
+    { k: 'Pickup ETA', v: `${pickupEta} min`, c: 'var(--success)' },
+    { k: 'Hospital ETA', v: `${hospitalEta} min`, c: 'var(--warning)' },
     { k: 'Patient Priority', v: priority?.label ?? 'Critical', c: priority?.color },
   ]
 
@@ -76,7 +82,8 @@ export default function Summary() {
             Patient <span className="grad-text">Delivered</span>
           </h1>
           <p>
-            {emergency?.label} emergency routed to {selectedHospital.name} with predictive rerouting.
+            {emergency?.label ?? 'Emergency'} routed to {hospitalName} with predictive routing.
+            Total distance: {totalDistKm} km.
           </p>
           {selectedAmbulance && (
             <span

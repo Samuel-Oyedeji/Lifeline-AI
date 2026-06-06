@@ -11,11 +11,20 @@ import Ambulances from './pages/Ambulances.jsx'
 import Hospitals from './pages/Hospitals.jsx'
 import RouteView from './pages/RouteView.jsx'
 import Summary from './pages/Summary.jsx'
+import AmbulancePage from './pages/AmbulancePage.jsx'
 
 export default function App() {
   const location = useLocation()
-  // Hide the floating widget on the full-bleed map page so it doesn't
-  // collide with the AI alert panel.
+
+  // Ambulance driver page — full-screen, no operator shell
+  if (location.pathname === '/ambulance') {
+    return (
+      <Routes>
+        <Route path="/ambulance" element={<AmbulancePage />} />
+      </Routes>
+    )
+  }
+
   const onRoutePage = location.pathname.startsWith('/route')
 
   return (
@@ -27,8 +36,8 @@ export default function App() {
           <Routes location={location} key={location.pathname}>
             <Route path="/" element={<Dispatch />} />
             <Route path="/ambulances" element={<Ambulances />} />
-            <Route path="/hospitals" element={<Hospitals />} />
             <Route path="/route" element={<RouteView />} />
+            <Route path="/hospitals" element={<Hospitals />} />
             <Route path="/summary" element={<Summary />} />
           </Routes>
         </AnimatePresence>

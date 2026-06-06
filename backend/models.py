@@ -16,6 +16,7 @@ class DispatchRequest(BaseModel):
     ambulance_id: str
     pickup: Coord
     patient: Optional[PatientInfo] = None
+    ambulance_position: Optional[Coord] = None  # fallback when ambulance GPS not yet streaming
 
 
 class DispatchResponse(BaseModel):

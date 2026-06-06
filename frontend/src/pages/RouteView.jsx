@@ -14,27 +14,85 @@ const pageMotion = {
 
 export default function RouteView() {
   const navigate = useNavigate()
-  const { selectedHospital } = useDispatch()
-  const [rerouted, setRerouted] = useState(false)
+  const { pickupRoute, hospitalRoute, pickupLatLng, selectedAmbulance, incidents } = useDispatch()
+  const [triggering, setTriggering] = useState(false)
+  const [triggerError, setTriggerError] = useState(null)
 
-  // Before reroute: only the red (current) route shows. Accepting the AI
-  // reroute reveals the green path and flips the ETA.
-  const currentEta = rerouted ? 8 : 13
-  const predictedDelay = rerouted ? 1 : 5
-  const timeSaved = 4
+  // Showing hospital route after patient pickup; pickup route otherwise
+  const isHospitalPhase = !!hospitalRoute
+
+  const geometry = isHospitalPhase ? hospitalRoute.geometry : pickupRoute?.geometry
+  const routeColor = isHospitalPhase ? '#22C55E' : '#EF4444'
+
+  const etaMin = isHospitalPhase
+    ? Math.round(hospitalRoute.effective_duration_s / 60)
+    : pickupRoute
+    ? Math.round(pickupRoute.duration_s / 60)
+    : '—'
+
+  const distanceKm = isHospitalPhase
+    ? (hospitalRoute.distance_m / 1000).toFixed(1)
+    : pickupRoute
+    ? (pickupRoute.distance_m / 1000).toFixed(1)
+    : '—'
+
+  const congestionIncidents = incidents.filter((i) => i.type === 'congestion')
+
+  // Show loading state while waiting for the WS route message
+  if (!geometry) {
+    return (
+      <motion.div
+        style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexDirection: 'column', gap: 18, background: 'var(--bg)',
+        }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <span className="spinner" style={{ width: 36, height: 36, borderWidth: 3 }} />
+        <p style={{ color: 'var(--text-dim)', fontSize: 15 }}>
+          Waiting for route from backend…
+        </p>
+      </motion.div>
+    )
+  }
+
+  async function handlePickedUp() {
+    if (!selectedAmbulance) return
+    setTriggering(true)
+    setTriggerError(null)
+    try {
+      const res = await fetch(`/api/trigger-hospital/${selectedAmbulance.id}`, { method: 'POST' })
+      if (!res.ok) {
+        const err = await res.json()
+        setTriggerError(err.detail?.message ?? err.detail ?? 'Hospital pipeline failed')
+        setTriggering(false)
+      }
+      // Navigation driven by WS hospital_route message → DispatchContext
+    } catch {
+      setTriggerError('Network error — could not reach server')
+      setTriggering(false)
+    }
+  }
 
   return (
     <motion.div style={{ position: 'absolute', inset: 0 }} {...pageMotion}>
       <div className="map-wrap">
-        <MapView hospital={selectedHospital} showRecommended={rerouted} showCurrent={true} />
+        <MapView
+          geometry={geometry}
+          routeColor={routeColor}
+          patientCoords={pickupLatLng}
+          hospital={isHospitalPhase ? hospitalRoute.destination : null}
+          incidents={incidents}
+        />
       </div>
 
       {/* Floating metric cards (top-left) */}
       <div className="map-overlays">
         {[
-          { k: 'Current ETA', v: `${currentEta} min`, c: '#fff' },
-          { k: 'Predicted Delay', v: `+${predictedDelay} min`, c: 'var(--warning)' },
-          { k: 'Time Saved', v: `${rerouted ? timeSaved : 0} min`, c: 'var(--success)' },
+          { k: isHospitalPhase ? 'Hospital ETA' : 'Pickup ETA', v: `${etaMin} min`, c: '#fff' },
+          { k: 'Distance', v: `${distanceKm} km`, c: 'var(--secondary)' },
         ].map((card, i) => (
           <motion.div
             key={card.k}
@@ -44,16 +102,14 @@ export default function RouteView() {
             transition={{ delay: 0.15 + i * 0.1 }}
           >
             <div className="fc-k">{card.k}</div>
-            <div className="fc-v" style={{ color: card.c }}>
-              {card.v}
-            </div>
+            <div className="fc-v" style={{ color: card.c }}>{card.v}</div>
           </motion.div>
         ))}
       </div>
 
-      {/* AI alert panel (right, pulsing) */}
+      {/* AI alert panel (right) */}
       <AnimatePresence>
-        {!rerouted && (
+        {!isHospitalPhase && congestionIncidents.length > 0 && (
           <motion.div
             className="glass ai-alert"
             initial={{ opacity: 0, x: 30 }}
@@ -66,28 +122,16 @@ export default function RouteView() {
               AI ALERT
             </div>
             <div className="aa-body">
-              Heavy congestion predicted on <strong>Ikorodu Road</strong> in{' '}
-              <strong style={{ color: 'var(--warning)' }}>6 mins</strong>. Recommended reroute
-              available.
+              {congestionIncidents[0].description ?? 'Traffic incident detected near route.'}
             </div>
             <div className="aa-saved">
-              <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>Est. time saved</span>
-              <span className="v">+4 min</span>
+              <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>Delay impact</span>
+              <span className="v">+{congestionIncidents[0].delay_min} min</span>
             </div>
-            <motion.button
-              className="btn"
-              style={{ marginTop: 14, background: 'linear-gradient(135deg,#22C55E,#16a34a)' }}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => setRerouted(true)}
-            >
-              <BoltIcon style={{ width: 18, height: 18 }} />
-              Accept Reroute
-            </motion.button>
           </motion.div>
         )}
 
-        {rerouted && (
+        {!isHospitalPhase && congestionIncidents.length === 0 && (
           <motion.div
             className="glass ai-alert"
             style={{ borderColor: 'rgba(34,197,94,0.5)', animation: 'none' }}
@@ -96,16 +140,9 @@ export default function RouteView() {
           >
             <div className="aa-head" style={{ color: 'var(--success)' }}>
               <BoltIcon style={{ width: 18, height: 18 }} />
-              REROUTED
+              ROUTE CLEAR
             </div>
-            <div className="aa-body">
-              Ambulance now on the <strong style={{ color: 'var(--success)' }}>green</strong>{' '}
-              predictive route — avoiding the Ikorodu Road jam before it forms.
-            </div>
-            <div className="aa-saved">
-              <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>Time saved</span>
-              <span className="v">4 min</span>
-            </div>
+            <div className="aa-body">No incidents detected on route to patient.</div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -113,27 +150,54 @@ export default function RouteView() {
       {/* Legend */}
       <div className="glass map-legend">
         <div className="lg-row">
-          <span className="swatch" style={{ background: '#EF4444' }} /> Current route
+          <span className="swatch" style={{ background: routeColor }} />
+          {isHospitalPhase ? 'Route to hospital' : 'Route to patient'}
         </div>
-        <div className="lg-row">
-          <span className="swatch" style={{ background: '#22C55E' }} /> Recommended reroute
-        </div>
-        <div className="lg-row">
-          <span className="swatch" style={{ background: '#F59E0B' }} /> Predicted congestion
-        </div>
+        {incidents.filter((i) => i.type === 'congestion').length > 0 && (
+          <div className="lg-row">
+            <span className="swatch" style={{ background: '#F59E0B' }} /> Congestion zone
+          </div>
+        )}
+        {incidents.filter((i) => i.type === 'blockage').length > 0 && (
+          <div className="lg-row">
+            <span className="swatch" style={{ background: '#EF4444' }} /> Road blockage
+          </div>
+        )}
       </div>
 
-      {/* Continue to summary */}
+      {/* Action bar */}
       <div className="reroute-bar">
-        <motion.button
-          className="btn"
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={() => navigate('/summary')}
-        >
-          <FlagIcon style={{ width: 18, height: 18 }} />
-          Mark Patient Delivered
-        </motion.button>
+        {triggerError && (
+          <div style={{ color: 'var(--critical)', fontSize: 13, marginBottom: 8 }}>
+            {triggerError}
+          </div>
+        )}
+        {isHospitalPhase ? (
+          <motion.button
+            className="btn"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => navigate('/summary')}
+          >
+            <FlagIcon style={{ width: 18, height: 18 }} />
+            Mark Patient Delivered
+          </motion.button>
+        ) : (
+          <motion.button
+            className="btn"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={handlePickedUp}
+            disabled={triggering || !selectedAmbulance}
+          >
+            {triggering ? (
+              <span className="spinner" style={{ marginRight: 8 }} />
+            ) : (
+              <BoltIcon style={{ width: 18, height: 18 }} />
+            )}
+            {triggering ? 'Computing hospital route…' : 'Patient Picked Up'}
+          </motion.button>
+        )}
       </div>
     </motion.div>
   )

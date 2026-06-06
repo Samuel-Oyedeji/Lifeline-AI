@@ -2,19 +2,19 @@
   "incidents": [
     {
       "type": "congestion",
-      "lat": 7.3880,
-      "lng": 3.8980,
-      "radius_m": 400,
+      "lat": 6.5112,
+      "lng": 3.3625,
+      "radius_m": 520,
       "delay_min": 20,
-      "description": "Market-day congestion near Ring Road"
+      "description": "Ikorodu Road — heavy market-day congestion"
     },
     {
       "type": "blockage",
-      "lat": 7.3950,
-      "lng": 3.9150,
+      "lat": 6.5043,
+      "lng": 3.3550,
       "radius_m": 200,
       "delay_min": 45,
-      "description": "Fallen trailer blocking Bodija Road"
+      "description": "Herbert Macaulay Way — fallen trailer"
     }
   ]
 }

@@ -2,8 +2,7 @@ import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useDispatch } from '../context/DispatchContext.jsx'
-import { PATIENT_LOCATION } from '../data/hospitals.js'
-import { rankByDistance } from '../data/ambulances.js'
+import { kmBetween, etaMinutes } from '../data/ambulances.js'
 import AmbulanceMap from '../components/AmbulanceMap.jsx'
 import { AmbulanceIcon, ClockIcon, PinIcon, BoltIcon, CheckIcon } from '../components/Icons.jsx'
 
@@ -16,22 +15,58 @@ const pageMotion = {
 
 export default function Ambulances() {
   const navigate = useNavigate()
-  const { dispatch, setDispatch } = useDispatch()
+  const { dispatch, setDispatch, liveAmbulances, pickupLatLng } = useDispatch()
+  const [selectedId, setSelectedId] = useState(null)
+  const [dispatching, setDispatching] = useState(false)
+  const [dispatchError, setDispatchError] = useState(null)
 
-  // Rank the whole fleet by real distance (haversine) to the patient.
-  const fleet = useMemo(() => rankByDistance(PATIENT_LOCATION.coords), [])
+  // Rank live fleet by haversine distance to the pickup point
+  const fleet = useMemo(() => {
+    return liveAmbulances
+      .map((a) => {
+        const km = kmBetween(a.coords, pickupLatLng)
+        return { ...a, distanceKm: km, etaMin: etaMinutes(km) }
+      })
+      .sort((x, y) => x.distanceKm - y.distanceKm)
+  }, [liveAmbulances, pickupLatLng])
+
   const closest = useMemo(() => fleet.find((a) => a.status === 'available'), [fleet])
   const maxKm = useMemo(() => Math.max(...fleet.map((a) => a.distanceKm)), [fleet])
 
-  // Pre-select the closest available unit; operator can override.
-  const [selectedId, setSelectedId] = useState(closest?.id ?? null)
-  const selected = fleet.find((a) => a.id === selectedId) ?? closest
-
+  const selected = fleet.find((a) => a.id === (selectedId ?? closest?.id)) ?? closest
   const availableCount = fleet.filter((a) => a.status === 'available').length
 
-  function dispatchUnit() {
+  async function dispatchUnit() {
+    if (!selected) return
+    setDispatching(true)
+    setDispatchError(null)
     setDispatch((d) => ({ ...d, selectedAmbulanceId: selected.id }))
-    navigate('/hospitals')
+
+    try {
+      const res = await fetch('/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ambulance_id: selected.id,
+          pickup: { lat: pickupLatLng[0], lng: pickupLatLng[1] },
+          // Send default coords as fallback so dispatch works even if driver page
+          // hasn't sent a GPS position yet.
+          ambulance_position: { lat: selected.coords[0], lng: selected.coords[1] },
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        setDispatchError(err.detail?.reason ?? err.detail ?? 'Dispatch failed')
+        setDispatching(false)
+        return
+      }
+      // Navigate immediately — WS route message will populate the map when it arrives.
+      // (DispatchContext also calls navigate('/route') on the message, which is a no-op.)
+      navigate('/route')
+    } catch {
+      setDispatchError('Network error — is the backend running?')
+      setDispatching(false)
+    }
   }
 
   return (
@@ -100,15 +135,26 @@ export default function Ambulances() {
             </div>
           </div>
 
+          {dispatchError && (
+            <div style={{ color: 'var(--critical)', fontSize: 13, marginTop: 8, lineHeight: 1.5 }}>
+              {dispatchError}
+            </div>
+          )}
+
           <motion.button
             className="btn"
             style={{ marginTop: 4 }}
             whileHover={{ scale: 1.015 }}
             whileTap={{ scale: 0.98 }}
             onClick={dispatchUnit}
+            disabled={dispatching || !selected}
           >
-            <BoltIcon style={{ width: 19, height: 19 }} />
-            Dispatch {selected?.id}
+            {dispatching ? (
+              <span className="spinner" style={{ marginRight: 8 }} />
+            ) : (
+              <BoltIcon style={{ width: 19, height: 19 }} />
+            )}
+            {dispatching ? 'Dispatching…' : `Dispatch ${selected?.id}`}
           </motion.button>
         </motion.div>
 
@@ -119,7 +165,12 @@ export default function Ambulances() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          <AmbulanceMap ambulances={fleet} selectedId={selected?.id} />
+          <AmbulanceMap
+            ambulances={fleet}
+            selectedId={selected?.id}
+            patientCoords={pickupLatLng}
+            patientName={dispatch.patientLocation}
+          />
         </motion.div>
       </div>
 
@@ -129,7 +180,7 @@ export default function Ambulances() {
       </div>
       <div className="grid-3">
         {fleet.map((a, i) => {
-          const busy = a.status === 'busy'
+          const busy = a.status === 'busy' || a.status === 'offline'
           const isSel = a.id === selected?.id
           const proximity = Math.max(6, Math.round((1 - a.distanceKm / maxKm) * 100))
           return (
@@ -157,7 +208,7 @@ export default function Ambulances() {
                     borderColor: busy ? 'var(--glass-border)' : 'rgba(34,197,94,0.4)',
                   }}
                 >
-                  {busy ? '● On call' : '● Available'}
+                  {a.status === 'offline' ? '● Offline' : busy ? '● On call' : '● Available'}
                 </span>
               </div>
 

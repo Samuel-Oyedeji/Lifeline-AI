@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
+import { MapContainer, TileLayer, CircleMarker, Tooltip, useMapEvents } from 'react-leaflet'
 import { useDispatch } from '../context/DispatchContext.jsx'
 import { EMERGENCY_TYPES, PRIORITIES } from '../data/hospitals.js'
 import { BoltIcon, CheckIcon, PinIcon } from '../components/Icons.jsx'
@@ -12,6 +13,9 @@ const STEPS = [
   'Predicting Congestion',
 ]
 
+const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+const ATTR = '&copy; OpenStreetMap &copy; CARTO'
+
 const pageMotion = {
   initial: { opacity: 0, y: 16 },
   animate: { opacity: 1, y: 0 },
@@ -19,9 +23,14 @@ const pageMotion = {
   transition: { duration: 0.4, ease: 'easeOut' },
 }
 
+function PickupPicker({ onPick }) {
+  useMapEvents({ click(e) { onPick([e.latlng.lat, e.latlng.lng]) } })
+  return null
+}
+
 export default function Dispatch() {
   const navigate = useNavigate()
-  const { dispatch, setDispatch } = useDispatch()
+  const { dispatch, setDispatch, pickupLatLng, setPickupLatLng } = useDispatch()
   const [analyzing, setAnalyzing] = useState(false)
   const [stepDone, setStepDone] = useState(-1)
 
@@ -30,7 +39,6 @@ export default function Dispatch() {
   function runAnalysis() {
     setAnalyzing(true)
     setStepDone(-1)
-    // Reveal each step with a checkmark, then route to recommendations.
     STEPS.forEach((_, i) => {
       setTimeout(() => setStepDone(i), 700 * (i + 1))
     })
@@ -169,6 +177,40 @@ export default function Dispatch() {
           </div>
         </motion.div>
       </div>
+
+      {/* Pickup location map */}
+      <motion.div
+        className="glass"
+        style={{ marginTop: 22, borderRadius: 14, overflow: 'hidden' }}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <div style={{ padding: '12px 16px 10px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <PinIcon style={{ width: 16, height: 16, color: 'var(--secondary)' }} />
+          <span className="label" style={{ margin: 0 }}>
+            Click map to pin exact pickup location
+          </span>
+          <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--text-dim)' }}>
+            {pickupLatLng[0].toFixed(5)}, {pickupLatLng[1].toFixed(5)}
+          </span>
+        </div>
+        <div style={{ height: 260 }}>
+          <MapContainer center={pickupLatLng} zoom={14} scrollWheelZoom={true} zoomControl={false}>
+            <TileLayer url={DARK_TILES} attribution={ATTR} subdomains="abcd" maxZoom={20} />
+            <PickupPicker onPick={setPickupLatLng} />
+            <CircleMarker
+              center={pickupLatLng}
+              radius={10}
+              pathOptions={{ color: '#fff', weight: 2, fillColor: '#3B82F6', fillOpacity: 1 }}
+            >
+              <Tooltip permanent direction="top" offset={[0, -10]}>
+                Patient · {dispatch.patientLocation}
+              </Tooltip>
+            </CircleMarker>
+          </MapContainer>
+        </div>
+      </motion.div>
 
       {/* Analyzing overlay */}
       {analyzing && (

@@ -42,13 +42,17 @@ async def list_ambulances():
 @app.post("/dispatch", response_model=DispatchResponse)
 async def dispatch(payload: DispatchRequest):
     conn = registry.get(payload.ambulance_id)
-    if not conn or not conn.last_position:
+
+    # Determine ambulance origin: prefer live GPS → fallback to request-provided coords
+    if conn and conn.last_position:
+        origin = Coord(lat=conn.last_position["lat"], lng=conn.last_position["lng"])
+    elif payload.ambulance_position:
+        origin = payload.ambulance_position
+    else:
         raise HTTPException(
             status_code=409,
-            detail={"status": "unavailable", "reason": "ambulance not connected"},
+            detail={"status": "unavailable", "reason": "ambulance not connected — open the driver page first"},
         )
-
-    origin = Coord(lat=conn.last_position["lat"], lng=conn.last_position["lng"])
 
     try:
         candidates = await get_candidate_routes(origin, payload.pickup)
@@ -69,7 +73,8 @@ async def dispatch(payload: DispatchRequest):
         "pickup": {"lat": payload.pickup.lat, "lng": payload.pickup.lng},
     }
 
-    await registry.push_to_ambulance(payload.ambulance_id, route_msg)
+    if conn:  # only push to ambulance device if it's actually connected
+        await registry.push_to_ambulance(payload.ambulance_id, route_msg)
     await registry.broadcast_to_dispatch(route_msg)
 
     return DispatchResponse(
@@ -110,6 +115,22 @@ async def delete_incident(inc_id: str):
 async def clear_incidents():
     incident_store.clear()
     return {"status": "cleared"}
+
+
+# ── Hospital pipeline HTTP trigger (dispatch console) ────────────────────────
+
+@app.post("/api/trigger-hospital/{ambulance_id}")
+async def trigger_hospital(ambulance_id: str):
+    """Allow the dispatch console to start the hospital pipeline without the ambulance device."""
+    if ambulance_id not in KNOWN_IDS:
+        raise HTTPException(status_code=404, detail="Unknown ambulance id")
+    payload = await _run_hospital_pipeline(ambulance_id)
+    await registry.push_to_ambulance(ambulance_id, payload)
+    if payload.get("type") == "hospital_route":
+        await registry.broadcast_to_dispatch(payload)
+    if payload.get("type") == "error":
+        raise HTTPException(status_code=409, detail=payload["message"])
+    return payload
 
 
 # ── Hospital pipeline ─────────────────────────────────────────────────────────
@@ -267,6 +288,11 @@ async def ws_dispatch(websocket: WebSocket):
 
 # ── Static files ──────────────────────────────────────────────────────────────
 
-app.mount("/dispatch",  StaticFiles(directory=str(FRONTEND_DIR / "dispatch"),  html=True), name="dispatch")
+# Driver device page (plain HTML, GPS streaming)
 app.mount("/ambulance", StaticFiles(directory=str(FRONTEND_DIR / "ambulance"), html=True), name="ambulance")
 app.mount("/shared",    StaticFiles(directory=str(FRONTEND_DIR / "shared")),               name="shared")
+
+# React dispatch console (served last — catch-all at root)
+_REACT_DIST = FRONTEND_DIR / "dist"
+if _REACT_DIST.exists():
+    app.mount("/", StaticFiles(directory=str(_REACT_DIST), html=True), name="spa")

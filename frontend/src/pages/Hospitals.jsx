@@ -1,8 +1,7 @@
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useDispatch } from '../context/DispatchContext.jsx'
-import { HOSPITALS } from '../data/hospitals.js'
-import { CheckIcon, ClockIcon, BedIcon, RouteIcon } from '../components/Icons.jsx'
+import { CheckIcon, ClockIcon, RouteIcon, WarnIcon } from '../components/Icons.jsx'
 
 const pageMotion = {
   initial: { opacity: 0, y: 16 },
@@ -44,13 +43,33 @@ function ScoreRing({ score }) {
 
 export default function Hospitals() {
   const navigate = useNavigate()
-  const { setDispatch } = useDispatch()
-  const best = HOSPITALS[0]
+  const { hospitalRoute } = useDispatch()
 
-  function pick(id) {
-    setDispatch((d) => ({ ...d, selectedHospitalId: id }))
-    navigate('/route')
+  if (!hospitalRoute) {
+    return (
+      <motion.div className="scroll" {...pageMotion}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '60vh',
+            flexDirection: 'column',
+            gap: 20,
+          }}
+        >
+          <span className="spinner" style={{ width: 40, height: 40 }} />
+          <p style={{ color: 'var(--text-dim)' }}>Computing best hospital…</p>
+        </div>
+      </motion.div>
+    )
   }
+
+  const { destination, effective_duration_s, distance_m, security_recommendation, alternatives } =
+    hospitalRoute
+  const etaMin = Math.round(effective_duration_s / 60)
+  const distanceKm = (distance_m / 1000).toFixed(1)
+  const secRec = security_recommendation?.recommended
 
   return (
     <motion.div className="scroll" {...pageMotion}>
@@ -61,8 +80,34 @@ export default function Hospitals() {
         <h1>
           Best hospital for this <span className="grad-text">patient</span>
         </h1>
-        <p>Ranked by ICU & bed availability, specialist match, live ETA and predicted delay.</p>
+        <p>Ranked by live ETA and predicted incident delay on each route.</p>
       </div>
+
+      {/* Security detail banner */}
+      {secRec && (
+        <motion.div
+          className="glass"
+          style={{
+            padding: '14px 18px',
+            marginBottom: 16,
+            border: '1px solid rgba(245,158,11,0.6)',
+            borderRadius: 12,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            color: '#F59E0B',
+          }}
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <WarnIcon style={{ width: 20, height: 20, flexShrink: 0 }} />
+          <span>
+            <strong>Security Detail Recommended</strong> — Clearable congestion on fastest route.{' '}
+            ~{Math.round(security_recommendation.estimated_time_saved_s / 60)} min could be saved
+            with escort.
+          </span>
+        </motion.div>
+      )}
 
       {/* Top recommendation card */}
       <motion.div
@@ -71,7 +116,7 @@ export default function Hospitals() {
         animate={{ opacity: 1, y: 0 }}
       >
         <div className="reco-grid">
-          <ScoreRing score={best.score} />
+          <ScoreRing score={95} />
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <span className="label" style={{ color: 'var(--success)' }}>
@@ -81,12 +126,16 @@ export default function Hospitals() {
                 className="chip"
                 style={{ color: 'var(--success)', borderColor: 'rgba(34,197,94,0.4)' }}
               >
-                4 min faster
+                {etaMin} min ETA
               </span>
             </div>
-            <h2 style={{ fontSize: 26, marginTop: 8 }}>{best.name}</h2>
+            <h2 style={{ fontSize: 26, marginTop: 8 }}>{destination.name}</h2>
             <div className="reasons">
-              {best.reasons.map((r, i) => (
+              {[
+                `${distanceKm} km from pickup point`,
+                `Effective ETA: ${etaMin} min (including incident delays)`,
+                'Fastest available route selected by AI',
+              ].map((r, i) => (
                 <motion.div
                   key={r}
                   className="reason"
@@ -104,7 +153,7 @@ export default function Hospitals() {
               style={{ width: 'auto', marginTop: 22, padding: '13px 24px' }}
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
-              onClick={() => pick(best.id)}
+              onClick={() => navigate('/route')}
             >
               <RouteIcon style={{ width: 18, height: 18 }} />
               View Predictive Route
@@ -113,98 +162,57 @@ export default function Hospitals() {
         </div>
       </motion.div>
 
-      {/* Comparison cards */}
-      <div className="label" style={{ margin: '26px 0 14px' }}>
-        All evaluated hospitals
-      </div>
-      <div className="grid-3">
-        {HOSPITALS.map((h, i) => (
-          <motion.div
-            key={h.id}
-            className={'glass hosp-card' + (h.id === best.id ? ' best' : '')}
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 + i * 0.1 }}
-            whileHover={{ y: -4 }}
-          >
-            <div className="hosp-head">
-              <div className="hosp-name">{h.name}</div>
-              {h.id === best.id && (
-                <span
-                  className="chip"
-                  style={{ color: 'var(--success)', borderColor: 'rgba(34,197,94,0.4)' }}
-                >
-                  Best
-                </span>
-              )}
-            </div>
-
-            <div className="hosp-metrics">
-              <div className="hosp-metric">
-                <div className="hm-k">
-                  <ClockIcon style={{ width: 13, height: 13, verticalAlign: '-2px' }} /> ETA
+      {/* Alternatives */}
+      {alternatives?.length > 0 && (
+        <>
+          <div className="label" style={{ margin: '26px 0 14px' }}>
+            Other hospitals evaluated
+          </div>
+          <div className="grid-3">
+            {alternatives.map((alt, i) => (
+              <motion.div
+                key={alt.name}
+                className="glass hosp-card"
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 + i * 0.1 }}
+                whileHover={{ y: -4 }}
+              >
+                <div className="hosp-head">
+                  <div className="hosp-name">{alt.name}</div>
                 </div>
-                <div className="hm-v">{h.etaMin} min</div>
-              </div>
-              <div className="hosp-metric">
-                <div className="hm-k">
-                  <BedIcon style={{ width: 13, height: 13, verticalAlign: '-2px' }} /> Beds
+                <div className="hosp-metrics">
+                  <div className="hosp-metric">
+                    <div className="hm-k">
+                      <ClockIcon style={{ width: 13, height: 13, verticalAlign: '-2px' }} /> ETA
+                    </div>
+                    <div className="hm-v">{Math.round(alt.effective_duration_s / 60)} min</div>
+                  </div>
+                  <div className="hosp-metric">
+                    <div className="hm-k">Base time</div>
+                    <div className="hm-v">{Math.round(alt.duration_s / 60)} min</div>
+                  </div>
                 </div>
-                <div className="hm-v">{h.bedsAvailable}</div>
-              </div>
-              <div className="hosp-metric">
-                <div className="hm-k">ICU</div>
-                <div className="hm-v" style={{ color: h.icu ? 'var(--success)' : 'var(--critical)' }}>
-                  {h.icu ? 'Available' : 'Full'}
+                <div>
+                  <div className="score-line">
+                    <div className="bar green" style={{ flex: 1 }}>
+                      <motion.span
+                        initial={{ width: 0 }}
+                        animate={{
+                          width: `${Math.round(
+                            (etaMin / Math.round(alt.effective_duration_s / 60)) * 80
+                          )}%`,
+                        }}
+                        transition={{ duration: 1, delay: 0.3 + i * 0.1 }}
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="hosp-metric">
-                <div className="hm-k">Pred. delay</div>
-                <div
-                  className="hm-v"
-                  style={{ color: h.predictedDelayMin <= 2 ? 'var(--success)' : 'var(--warning)' }}
-                >
-                  +{h.predictedDelayMin} min
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <div className="hm-k" style={{ marginBottom: 6 }}>
-                Specialists
-              </div>
-              <div className="spec-tags">
-                {h.specialists.map((s) => (
-                  <span key={s} className="spec-tag">
-                    {s}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div className="score-line">
-                <div className="bar green" style={{ flex: 1 }}>
-                  <motion.span
-                    initial={{ width: 0 }}
-                    animate={{ width: `${h.score}%` }}
-                    transition={{ duration: 1, delay: 0.3 + i * 0.1 }}
-                  />
-                </div>
-                <span className="sl-num">{h.score}</span>
-              </div>
-            </div>
-
-            <button
-              className={'btn ' + (h.id === best.id ? '' : 'btn-ghost')}
-              style={{ marginTop: 4 }}
-              onClick={() => pick(h.id)}
-            >
-              {h.id === best.id ? 'Route Here' : 'Select'}
-            </button>
-          </motion.div>
-        ))}
-      </div>
+              </motion.div>
+            ))}
+          </div>
+        </>
+      )}
     </motion.div>
   )
 }

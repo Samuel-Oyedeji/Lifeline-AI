@@ -1,56 +1,13 @@
-// Mock ambulance fleet (Lagos). In production this would be a live feed of
-// GPS positions + availability from the backend (AWS IoT / Lambda). Shape is
-// kept API-like so swapping the source later is a one-line change.
-
+// Ambulance fleet metadata — IDs match backend ambulances.json.
+// coords are default/last-known positions; live positions come from the dispatch WebSocket.
+// status starts as 'available'; the backend may update this in future phases.
 export const AMBULANCES = [
-  {
-    id: 'LAG-A12',
-    coords: [6.5121, 3.3685],
-    status: 'available',
-    type: 'Advanced Life Support',
-    crew: 'Paramedic + EMT',
-    plate: 'LND-238-AA',
-  },
-  {
-    id: 'LAG-B07',
-    coords: [6.5043, 3.3779],
-    status: 'available',
-    type: 'Advanced Life Support',
-    crew: 'Paramedic + EMT',
-    plate: 'KJA-114-XB',
-  },
-  {
-    id: 'LAG-C21',
-    coords: [6.5202, 3.3622],
-    status: 'available',
-    type: 'Basic Life Support',
-    crew: 'EMT x2',
-    plate: 'EPE-907-LC',
-  },
-  {
-    id: 'LAG-D03',
-    coords: [6.4998, 3.355],
-    status: 'busy',
-    type: 'Advanced Life Support',
-    crew: 'Paramedic + EMT',
-    plate: 'AGL-552-KD',
-  },
-  {
-    id: 'LAG-E15',
-    coords: [6.531, 3.3789],
-    status: 'available',
-    type: 'Basic Life Support',
-    crew: 'EMT x2',
-    plate: 'IKD-330-RE',
-  },
-  {
-    id: 'LAG-F09',
-    coords: [6.4885, 3.3702],
-    status: 'busy',
-    type: 'Advanced Life Support',
-    crew: 'Paramedic + EMT',
-    plate: 'SUR-741-MF',
-  },
+  { id: 'LAG-A12', coords: [6.5121, 3.3685], status: 'available', type: 'Advanced Life Support', crew: 'Paramedic + EMT', plate: 'LND-238-AA' },
+  { id: 'LAG-B07', coords: [6.5043, 3.3779], status: 'available', type: 'Advanced Life Support', crew: 'Paramedic + EMT', plate: 'KJA-114-XB' },
+  { id: 'LAG-C21', coords: [6.5202, 3.3622], status: 'available', type: 'Basic Life Support',    crew: 'EMT x2',          plate: 'EPE-907-LC' },
+  { id: 'LAG-D03', coords: [6.4998, 3.3550], status: 'busy',      type: 'Advanced Life Support', crew: 'Paramedic + EMT', plate: 'AGL-552-KD' },
+  { id: 'LAG-E15', coords: [6.5310, 3.3789], status: 'available', type: 'Basic Life Support',    crew: 'EMT x2',          plate: 'IKD-330-RE' },
+  { id: 'LAG-F09', coords: [6.4885, 3.3702], status: 'busy',      type: 'Advanced Life Support', crew: 'Paramedic + EMT', plate: 'SUR-741-MF' },
 ]
 
 // Haversine distance in km between two [lat, lng] points.

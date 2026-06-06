@@ -402,6 +402,7 @@
   place-items: center;
   flex-shrink: 0;
 }
+.spinner,
 .step-row .spinner {
   width: 18px;
   height: 18px;
@@ -409,6 +410,8 @@
   border: 2px solid rgba(255, 255, 255, 0.18);
   border-top-color: var(--primary);
   animation: spin 0.7s linear infinite;
+  display: inline-block;
+  flex-shrink: 0;
 }
 .step-row .check {
   width: 28px;
