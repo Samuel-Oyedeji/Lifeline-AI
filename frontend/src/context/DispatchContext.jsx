@@ -63,7 +63,8 @@ export function DispatchProvider({ children }) {
     let timer
 
     function connect() {
-      ws = new WebSocket(`ws://${window.location.host}/ws/dispatch`)
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/dispatch`)
 
       ws.onopen = () => setWsStatus('connected')
 
